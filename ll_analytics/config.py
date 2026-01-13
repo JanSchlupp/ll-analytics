@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Get the project root directory (where this config.py lives, go up one level)
+PROJECT_ROOT = Path(__file__).parent.parent
+
 
 class Config:
     """Application configuration."""
@@ -16,8 +19,8 @@ class Config:
     LL_PASSWORD: str = os.getenv("LL_PASSWORD", "")
     LL_BASE_URL: str = "https://learnedleague.com"
 
-    # Database
-    DATABASE_PATH: Path = Path(os.getenv("DATABASE_PATH", "./data/ll_analytics.db"))
+    # Database - use absolute path relative to project root
+    DATABASE_PATH: Path = Path(os.getenv("DATABASE_PATH", str(PROJECT_ROOT / "data" / "ll_analytics.db")))
 
     # API settings
     API_HOST: str = os.getenv("API_HOST", "127.0.0.1")
