@@ -1,0 +1,152 @@
+<!-- Dynamic Metric Renderer Template -->
+<!-- This template handles rendering any metric result based on its visualization type -->
+
+<div class="metric-renderer" x-data="{ result: null }">
+    <!-- Leaderboard Visualization -->
+    <template x-if="result?.visualization === 'leaderboard'">
+        <div class="overflow-x-auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <template x-for="col in result?.columns || []" :key="col">
+                            <th x-text="col"></th>
+                        </template>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="(row, idx) in result?.data || []" :key="idx">
+                        <tr>
+                            <!-- Render each column dynamically -->
+                            <template x-for="(col, colIdx) in result?.columns || []" :key="colIdx">
+                                <td>
+                                    <!-- Special handling for common column names -->
+                                    <template x-if="col.toLowerCase() === 'rank'">
+                                        <span class="font-medium" x-text="row.rank"></span>
+                                    </template>
+                                    <template x-if="col.toLowerCase() === 'player' || col.toLowerCase() === 'username'">
+                                        <a :href="'/players/' + row.username"
+                                           class="text-indigo-600 hover:underline"
+                                           x-text="row.username"></a>
+                                    </template>
+                                    <template x-if="col.toLowerCase().includes('surprise') || col.toLowerCase().includes('score')">
+                                        <span :class="getValueClass(row)"
+                                              x-text="formatNumber(getColumnValue(row, col))"></span>
+                                    </template>
+                                    <template x-if="!isSpecialColumn(col)">
+                                        <span x-text="formatValue(getColumnValue(row, col))"></span>
+                                    </template>
+                                </td>
+                            </template>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </template>
+
+    <!-- Line Chart Visualization -->
+    <template x-if="result?.visualization === 'line'">
+        <div class="chart-container">
+            <canvas x-ref="lineChart"></canvas>
+        </div>
+    </template>
+
+    <!-- Bar Chart Visualization -->
+    <template x-if="result?.visualization === 'bar'">
+        <div class="chart-container">
+            <canvas x-ref="barChart"></canvas>
+        </div>
+    </template>
+
+    <!-- Scatter Plot Visualization -->
+    <template x-if="result?.visualization === 'scatter'">
+        <div class="chart-container">
+            <canvas x-ref="scatterChart"></canvas>
+        </div>
+    </template>
+
+    <!-- Heatmap Visualization -->
+    <template x-if="result?.visualization === 'heatmap'">
+        <div class="heatmap-container">
+            <!-- Heatmap would be rendered here -->
+            <p class="text-gray-500">Heatmap visualization coming soon...</p>
+        </div>
+    </template>
+
+    <!-- Histogram Visualization -->
+    <template x-if="result?.visualization === 'histogram'">
+        <div class="chart-container">
+            <canvas x-ref="histogramChart"></canvas>
+        </div>
+    </template>
+</div>
+
+<script>
+// Helper functions for the metric renderer
+function metricRenderer(initialResult = null) {
+    return {
+        result: initialResult,
+        chart: null,
+
+        setResult(result) {
+            this.result = result;
+            this.$nextTick(() => this.renderChart());
+        },
+
+        isSpecialColumn(col) {
+            const lower = col.toLowerCase();
+            return lower === 'rank' ||
+                   lower === 'player' ||
+                   lower === 'username' ||
+                   lower.includes('surprise') ||
+                   lower.includes('score');
+        },
+
+        getColumnValue(row, col) {
+            // Try common mappings
+            const key = col.toLowerCase()
+                .replace(/\s+/g, '_')
+                .replace('total surprise', 'total_surprise')
+                .replace('avg surprise', 'avg_surprise');
+
+            return row[key] ?? row[col] ?? '-';
+        },
+
+        getValueClass(row) {
+            const surprise = row.total_surprise ?? row.score ?? 0;
+            return surprise > 0 ? 'positive' : surprise < 0 ? 'negative' : '';
+        },
+
+        formatNumber(val) {
+            if (val === null || val === undefined || val === '-') return '-';
+            if (typeof val !== 'number') return val;
+            const sign = val >= 0 ? '+' : '';
+            return sign + val.toFixed(2);
+        },
+
+        formatValue(val) {
+            if (val === null || val === undefined) return '-';
+            if (typeof val === 'number') {
+                return val % 1 === 0 ? val : val.toFixed(2);
+            }
+            return val;
+        },
+
+        renderChart() {
+            if (!this.result) return;
+
+            // Destroy existing chart
+            if (this.chart) {
+                this.chart.destroy();
+                this.chart = null;
+            }
+
+            // Render based on visualization type
+            if (window.LLCharts) {
+                const containerId = 'metric-chart-container';
+                this.chart = window.LLCharts.renderMetricChart(containerId, this.result);
+            }
+        }
+    };
+}
+</script>

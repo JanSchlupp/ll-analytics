@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - LL Analytics{% endblock %}
+
+{% block content %}
+<div x-data="dashboard()" x-init="init()">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Dashboard</h1>
+
+    <!-- Metric and Season Selector -->
+    <div class="bg-white rounded-lg shadow p-4 mb-6">
+        <div class="flex flex-wrap gap-4">
+            <div class="flex-1 min-w-[200px]">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Metric</label>
+                <select x-model="selectedMetric" @change="loadMetric()"
+                        class="w-full border rounded px-3 py-2">
+                    <option value="">Select a metric...</option>
+                    <template x-for="m in metrics" :key="m.id">
+                        <option :value="m.id" x-text="m.name"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="flex-1 min-w-[200px]">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Season</label>
+                <select x-model="selectedSeason" @change="loadMetric()"
+                        class="w-full border rounded px-3 py-2">
+                    <option value="">Select a season...</option>
+                    <template x-for="s in seasons" :key="s.id">
+                        <option :value="s.season_number" x-text="'Season ' + s.season_number"></option>
+                    </template>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div x-show="loading" class="text-center py-8">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <p class="mt-2 text-gray-600">Loading...</p>
+    </div>
+
+    <!-- Metric Result -->
+    <div x-show="!loading && result" x-cloak>
+        <!-- Title and Description -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800" x-text="result?.title"></h2>
+            <p class="text-gray-600 mt-1" x-text="result?.description"></p>
+        </div>
+
+        <!-- Dynamic Visualization -->
+        <div class="bg-white rounded-lg shadow p-4">
+            <!-- Leaderboard -->
+            <template x-if="result?.visualization === 'leaderboard'">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <template x-for="col in result?.columns || []" :key="col">
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                        x-text="col"></th>
+                                </template>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <template x-for="(row, idx) in result?.data || []" :key="idx">
+                                <tr :class="idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'">
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900"
+                                        x-text="row.rank"></td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-indigo-600">
+                                        <a :href="'/players/' + row.username" x-text="row.username"
+                                           class="hover:underline"></a>
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm"
+                                        :class="row.total_surprise > 0 ? 'text-green-600' : 'text-red-600'"
+                                        x-text="row.total_surprise?.toFixed(2)"></td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500"
+                                        x-text="row.avg_surprise?.toFixed(3)"></td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500"
+                                        x-text="row.questions"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+
+            <!-- Line Chart -->
+            <template x-if="result?.visualization === 'line'">
+                <div>
+                    <canvas id="lineChart" width="400" height="200"></canvas>
+                </div>
+            </template>
+
+            <!-- Bar Chart -->
+            <template x-if="result?.visualization === 'bar'">
+                <div>
+                    <canvas id="barChart" width="400" height="200"></canvas>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- No Data State -->
+    <div x-show="!loading && !result && selectedMetric && selectedSeason" x-cloak
+         class="bg-white rounded-lg shadow p-8 text-center">
+        <p class="text-gray-600">No data available for this selection.</p>
+    </div>
+
+    <!-- Getting Started -->
+    <div x-show="!selectedMetric || !selectedSeason" x-cloak
+         class="bg-white rounded-lg shadow p-8 text-center">
+        <h2 class="text-xl font-semibold text-gray-800 mb-2">Welcome to LL Analytics</h2>
+        <p class="text-gray-600 mb-4">Select a metric and season above to view analysis.</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            <div class="p-4 bg-indigo-50 rounded-lg">
+                <h3 class="font-semibold text-indigo-800">Performance Surprise</h3>
+                <p class="text-sm text-indigo-600">Track unexpected performances based on historical category data</p>
+            </div>
+            <div class="p-4 bg-indigo-50 rounded-lg">
+                <h3 class="font-semibold text-indigo-800">Late-Season Spike</h3>
+                <p class="text-sm text-indigo-600">Compare early vs late season performance</p>
+            </div>
+            <div class="p-4 bg-indigo-50 rounded-lg">
+                <h3 class="font-semibold text-indigo-800">More Coming...</h3>
+                <p class="text-sm text-indigo-600">The plugin system makes it easy to add new metrics</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function dashboard() {
+    return {
+        metrics: [],
+        seasons: [],
+        selectedMetric: '',
+        selectedSeason: '',
+        result: null,
+        loading: false,
+        chart: null,
+
+        async init() {
+            // Load available metrics
+            const metricsRes = await fetch('/api/metrics');
+            const metricsData = await metricsRes.json();
+            this.metrics = metricsData.metrics;
+
+            // Load available seasons
+            const seasonsRes = await fetch('/api/seasons');
+            const seasonsData = await seasonsRes.json();
+            this.seasons = seasonsData.seasons;
+        },
+
+        async loadMetric() {
+            if (!this.selectedMetric || !this.selectedSeason) return;
+
+            this.loading = true;
+            this.result = null;
+
+            try {
+                const res = await fetch(
+                    `/api/metrics/${this.selectedMetric}/season/${this.selectedSeason}`
+                );
+                this.result = await res.json();
+
+                // Render chart if needed
+                this.$nextTick(() => {
+                    this.renderChart();
+                });
+            } catch (err) {
+                console.error('Failed to load metric:', err);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        renderChart() {
+            if (!this.result) return;
+
+            // Destroy existing chart
+            if (this.chart) {
+                this.chart.destroy();
+                this.chart = null;
+            }
+
+            if (this.result.visualization === 'line') {
+                const ctx = document.getElementById('lineChart');
+                if (ctx && this.result.data?.details) {
+                    this.chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: this.result.data.details.map(d => `Day ${d.match_day}`),
+                            datasets: [{
+                                label: 'Cumulative Surprise',
+                                data: this.result.data.details.map(d => d.cumulative),
+                                borderColor: 'rgb(79, 70, 229)',
+                                tension: 0.1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: this.result.chart_config?.title || 'Surprise Over Time'
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

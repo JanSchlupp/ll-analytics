@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+
+{% block title %}{{ player.ll_username if player else "Player Not Found" }} - LL Analytics{% endblock %}
+
+{% block content %}
+{% if not player %}
+<div class="bg-red-50 border border-red-200 rounded-lg p-4">
+    <p class="text-red-800">{{ error or "Player not found" }}</p>
+    <a href="/" class="text-indigo-600 hover:underline mt-2 inline-block">Back to Home</a>
+</div>
+{% else %}
+
+<div x-data="{ activeTab: 'overview', expandedMetric: null }">
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="flex items-center gap-4">
+            <h1 class="text-3xl font-bold text-gray-900">{{ player.ll_username }}</h1>
+            {% if player.display_name and player.display_name != player.ll_username %}
+            <span class="text-gray-500">({{ player.display_name }})</span>
+            {% endif %}
+        </div>
+        {% if season %}
+        <p class="text-gray-600 mt-1">Season {{ season.season_number }} Performance</p>
+        {% endif %}
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm text-gray-500">Total Correct</div>
+            <div class="text-2xl font-bold text-indigo-600">{{ totals.tca or 0 }}</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm text-gray-500">Questions Answered</div>
+            <div class="text-2xl font-bold text-gray-900">{{ totals.total_q or 0 }}</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm text-gray-500">CA%</div>
+            <div class="text-2xl font-bold text-green-600">
+                {% if totals.total_q and totals.total_q > 0 %}
+                    {{ "%.1f"|format((totals.tca or 0) / totals.total_q * 100) }}%
+                {% else %}
+                    -
+                {% endif %}
+            </div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm text-gray-500">Match Days</div>
+            <div class="text-2xl font-bold text-gray-900">{{ match_results|length }}</div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="border-b border-gray-200 mb-6">
+        <nav class="flex space-x-8">
+            <button
+                @click="activeTab = 'overview'"
+                :class="activeTab === 'overview' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                class="py-2 px-1 border-b-2 font-medium text-sm"
+            >Overview</button>
+            <button
+                @click="activeTab = 'metrics'"
+                :class="activeTab === 'metrics' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                class="py-2 px-1 border-b-2 font-medium text-sm"
+            >Metrics</button>
+            <button
+                @click="activeTab = 'categories'"
+                :class="activeTab === 'categories' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                class="py-2 px-1 border-b-2 font-medium text-sm"
+            >Categories</button>
+            <button
+                @click="activeTab = 'matches'"
+                :class="activeTab === 'matches' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                class="py-2 px-1 border-b-2 font-medium text-sm"
+            >Match History</button>
+        </nav>
+    </div>
+
+    <!-- Overview Tab -->
+    <div x-show="activeTab === 'overview'" class="space-y-6">
+        <!-- Match Day Chart -->
+        <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Performance by Match Day</h3>
+            <canvas id="matchDayChart" height="200"></canvas>
+        </div>
+
+        <!-- Category Strengths (Top 5) -->
+        {% if category_stats %}
+        <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Category Strengths</h3>
+            <div class="space-y-3">
+                {% for cat in category_stats[:5] %}
+                <div class="flex items-center">
+                    <span class="w-32 text-sm text-gray-600">{{ cat.name }}</span>
+                    <div class="flex-1 mx-4">
+                        <div class="bg-gray-200 rounded-full h-4">
+                            <div class="bg-indigo-600 h-4 rounded-full" style="width: {{ (cat.correct_pct or 0) * 100 }}%"></div>
+                        </div>
+                    </div>
+                    <span class="text-sm font-medium text-gray-900">{{ "%.0f"|format((cat.correct_pct or 0) * 100) }}%</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Metrics Tab -->
+    <div x-show="activeTab === 'metrics'" class="space-y-4">
+        <p class="text-sm text-gray-600 mb-4">
+            Click on any metric card to see detailed breakdown and explanation.
+        </p>
+
+        {% for metric_id, metric in metrics.items() %}
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <!-- Metric Header (always visible) -->
+            <button
+                @click="expandedMetric = expandedMetric === '{{ metric_id }}' ? null : '{{ metric_id }}'"
+                class="w-full px-4 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+            >
+                <div class="flex-1 text-left">
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-medium text-gray-900">{{ metric.name }}</h3>
+                        <!-- Info icon with tooltip -->
+                        <span class="group relative">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                                {{ metric.description }}
+                            </span>
+                        </span>
+                    </div>
+                    {% if metric.result %}
+                    <p class="text-sm text-gray-500 mt-1">{{ metric.description }}</p>
+                    {% elif metric.error %}
+                    <p class="text-sm text-red-500 mt-1">Error calculating metric</p>
+                    {% endif %}
+                </div>
+
+                <!-- Metric Value -->
+                <div class="flex items-center gap-4">
+                    {% if metric.result and metric.result.data %}
+                        {% if metric.result.data.get('total_surprise') is not none %}
+                        <span class="text-xl font-bold {% if metric.result.data.get('total_surprise', 0) > 0 %}text-green-600{% elif metric.result.data.get('total_surprise', 0) < 0 %}text-red-600{% else %}text-gray-600{% endif %}">
+                            {{ "%+.2f"|format(metric.result.data.get('total_surprise', 0)) }}
+                        </span>
+                        {% elif metric.result.data.get('early_pct') is not none %}
+                        <span class="text-xl font-bold {% if metric.result.data.get('z_score', 0) > 1.5 %}text-orange-600{% elif metric.result.data.get('z_score', 0) < -1.5 %}text-blue-600{% else %}text-gray-600{% endif %}">
+                            {% if metric.result.data.get('z_score', 0) > 0 %}+{% endif %}{{ "%.2f"|format(metric.result.data.get('z_score', 0)) }} z
+                        </span>
+                        {% endif %}
+                    {% endif %}
+
+                    <!-- Expand/collapse arrow -->
+                    <svg
+                        class="w-5 h-5 text-gray-400 transition-transform"
+                        :class="expandedMetric === '{{ metric_id }}' ? 'rotate-180' : ''"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+            </button>
+
+            <!-- Expanded Details -->
+            <div
+                x-show="expandedMetric === '{{ metric_id }}'"
+                x-collapse
+                class="border-t border-gray-200 px-4 py-4 bg-gray-50"
+            >
+                {% if metric.error %}
+                <p class="text-red-600">{{ metric.error }}</p>
+                {% elif metric.result and metric.result.data %}
+
+                <!-- Surprise Metric Details -->
+                {% if metric_id == 'surprise' and metric.result.data.get('total_surprise') is not none %}
+                <div class="space-y-4">
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div class="text-2xl font-bold text-indigo-600">{{ "%.2f"|format(metric.result.data.get('total_surprise', 0)) }}</div>
+                            <div class="text-sm text-gray-500">Total Surprise</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-gray-900">{{ "%.3f"|format(metric.result.data.get('avg_surprise', 0)) }}</div>
+                            <div class="text-sm text-gray-500">Avg per Question</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-gray-900">{{ metric.result.data.get('questions_analyzed', 0) }}</div>
+                            <div class="text-sm text-gray-500">Questions Analyzed</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <h4 class="font-medium text-gray-900 mb-2">How Surprise is Calculated</h4>
+                        <p class="text-sm text-gray-600">
+                            For each question, we calculate an "expected probability" of you answering correctly based on:
+                        </p>
+                        <ul class="text-sm text-gray-600 list-disc ml-5 mt-2 space-y-1">
+                            <li>Your historical performance in that category</li>
+                            <li>The question's difficulty (rundle-wide correct %)</li>
+                        </ul>
+                        <p class="text-sm text-gray-600 mt-2">
+                            <strong>Positive surprise</strong> means you performed better than expected.
+                            <strong>Negative surprise</strong> means you underperformed expectations.
+                        </p>
+                    </div>
+
+                    <div class="mt-4 flex gap-2">
+                        <a href="/player/{{ player.ll_username }}/surprise?season={{ season.season_number }}"
+                           class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700">
+                            View Per-Question Breakdown
+                            <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                            </svg>
+                        </a>
+                    </div>
+
+                    {% if metric.result.data.get('by_day') %}
+                    <div class="mt-4">
+                        <h4 class="font-medium text-gray-900 mb-2">Surprise by Match Day</h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead>
+                                    <tr class="border-b">
+                                        <th class="text-left py-2 px-2">Day</th>
+                                        <th class="text-right py-2 px-2">Surprise</th>
+                                        <th class="text-right py-2 px-2">Questions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for day in metric.result.data.get('by_day', []) %}
+                                    <tr class="border-b border-gray-100">
+                                        <td class="py-2 px-2">Day {{ day.get('match_day', '?') }}</td>
+                                        <td class="text-right py-2 px-2 {% if day.get('surprise', 0) > 0 %}text-green-600{% elif day.get('surprise', 0) < 0 %}text-red-600{% endif %}">
+                                            {{ "%+.2f"|format(day.get('surprise', 0)) }}
+                                        </td>
+                                        <td class="text-right py-2 px-2 text-gray-500">{{ day.get('questions', 0) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Late Spike Metric Details -->
+                {% elif metric_id == 'late_spike' and metric.result.data.get('early_pct') is not none %}
+                <div class="space-y-4">
+                    <div class="grid grid-cols-4 gap-4 text-center">
+                        <div>
+                            <div class="text-2xl font-bold text-gray-900">{{ "%.1f"|format(metric.result.data.get('early_pct', 0) * 100) }}%</div>
+                            <div class="text-sm text-gray-500">Early (Days 1-10)</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-gray-900">{{ "%.1f"|format(metric.result.data.get('late_pct', 0) * 100) }}%</div>
+                            <div class="text-sm text-gray-500">Late (Days 20-25)</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold {% if metric.result.data.get('change', 0) > 0 %}text-green-600{% elif metric.result.data.get('change', 0) < 0 %}text-red-600{% endif %}">
+                                {{ "%+.1f"|format(metric.result.data.get('change', 0) * 100) }}%
+                            </div>
+                            <div class="text-sm text-gray-500">Change</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold {% if metric.result.data.get('z_score', 0) > 1.5 %}text-orange-600{% elif metric.result.data.get('z_score', 0) < -1.5 %}text-blue-600{% endif %}">
+                                {{ "%.2f"|format(metric.result.data.get('z_score', 0)) }}
+                            </div>
+                            <div class="text-sm text-gray-500">Z-Score</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <h4 class="font-medium text-gray-900 mb-2">What This Means</h4>
+                        <p class="text-sm text-gray-600">
+                            This metric compares your correct answer percentage in the early part of the season (days 1-10)
+                            versus the late part (days 20-25).
+                        </p>
+                        <ul class="text-sm text-gray-600 list-disc ml-5 mt-2 space-y-1">
+                            <li><strong>Z-Score > 1.5:</strong> Unusually large late-season improvement</li>
+                            <li><strong>Z-Score between -1.5 and 1.5:</strong> Normal variation</li>
+                            <li><strong>Z-Score < -1.5:</strong> Unusually large late-season decline</li>
+                        </ul>
+                    </div>
+                </div>
+                {% else %}
+                <!-- Generic metric data display -->
+                <pre class="text-xs bg-gray-100 p-2 rounded overflow-x-auto">{{ metric.result.data | tojson(indent=2) }}</pre>
+                {% endif %}
+
+                {% else %}
+                <p class="text-gray-500">No data available for this metric.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <p class="text-gray-500">No metrics available.</p>
+        {% endfor %}
+    </div>
+
+    <!-- Categories Tab -->
+    <div x-show="activeTab === 'categories'">
+        {% if category_stats %}
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Correct %</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Questions</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Performance</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for cat in category_stats %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{{ cat.name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-900">{{ "%.1f"|format((cat.correct_pct or 0) * 100) }}%</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ cat.total_questions or 0 }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="w-32 bg-gray-200 rounded-full h-2">
+                                <div class="{% if (cat.correct_pct or 0) >= 0.7 %}bg-green-500{% elif (cat.correct_pct or 0) >= 0.5 %}bg-yellow-500{% else %}bg-red-500{% endif %} h-2 rounded-full" style="width: {{ (cat.correct_pct or 0) * 100 }}%"></div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-500">No category data available.</p>
+        {% endif %}
+    </div>
+
+    <!-- Matches Tab -->
+    <div x-show="activeTab === 'matches'">
+        {% if match_results %}
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Match Day</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Correct</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Percentage</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for match in match_results %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">Day {{ match.match_day }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-900">{{ match.correct }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ match.questions }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% set pct = match.correct / match.questions * 100 if match.questions > 0 else 0 %}
+                            <span class="{% if pct >= 83 %}text-green-600{% elif pct >= 50 %}text-yellow-600{% else %}text-red-600{% endif %} font-medium">
+                                {{ "%.0f"|format(pct) }}%
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-500">No match history available.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Match day performance chart
+    const matchData = {{ match_results | tojson }};
+    if (matchData.length > 0) {
+        const ctx = document.getElementById('matchDayChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: matchData.map(m => 'Day ' + m.match_day),
+                    datasets: [{
+                        label: 'Correct Answers',
+                        data: matchData.map(m => m.correct),
+                        backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                        borderColor: 'rgb(99, 102, 241)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 6,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+        }
+    }
+});
+</script>
+{% endblock %}

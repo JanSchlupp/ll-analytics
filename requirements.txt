@@ -1,0 +1,19 @@
+# Core
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+
+# API
+fastapi>=0.109.0
+uvicorn>=0.27.0
+pydantic>=2.5.0
+
+# Config
+python-dotenv>=1.0.0
+
+# Templates
+jinja2>=3.1.0
+aiofiles>=23.2.0
+
+# Async HTTP (optional)
+httpx>=0.26.0
