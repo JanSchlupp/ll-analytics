@@ -233,6 +233,58 @@ window.LLComponents = {
     },
 };
 
+// Global player search component for navbar
+function playerSearch() {
+    return {
+        query: '',
+        results: [],
+        loading: false,
+        showResults: false,
+        selectedIndex: -1,
+
+        async search() {
+            if (this.query.length < 1) {
+                this.results = [];
+                this.showResults = false;
+                return;
+            }
+
+            this.loading = true;
+            try {
+                const response = await fetch(`/api/players/search/autocomplete?q=${encodeURIComponent(this.query)}`);
+                const data = await response.json();
+                this.results = data.results;
+                this.showResults = this.results.length > 0;
+                this.selectedIndex = -1;
+            } catch (err) {
+                console.error('Search failed:', err);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        goToFirst() {
+            if (this.results.length > 0) {
+                const target = this.selectedIndex >= 0 ? this.results[this.selectedIndex] : this.results[0];
+                window.location.href = `/player/${target}`;
+            }
+        },
+
+        selectNext() {
+            if (this.results.length > 0) {
+                this.selectedIndex = (this.selectedIndex + 1) % this.results.length;
+            }
+        },
+
+        selectPrev() {
+            if (this.results.length > 0) {
+                this.selectedIndex = this.selectedIndex <= 0 ? this.results.length - 1 : this.selectedIndex - 1;
+            }
+        }
+    };
+}
+
 // Export for use in templates
 window.API = API;
 window.Utils = Utils;
+window.playerSearch = playerSearch;

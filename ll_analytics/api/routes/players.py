@@ -53,6 +53,35 @@ async def list_players(
         }
 
 
+@router.get("/search/autocomplete")
+async def search_players_autocomplete(
+    q: str = Query(..., min_length=1, description="Search query"),
+    limit: int = Query(10, ge=1, le=50),
+):
+    """
+    Search players for autocomplete. Returns minimal data for fast responses.
+
+    Args:
+        q: Search query (matches start of username or anywhere in username)
+        limit: Maximum results to return
+    """
+    with get_connection() as conn:
+        # Prioritize exact prefix matches, then contains matches
+        rows = conn.execute("""
+            SELECT ll_username,
+                   CASE WHEN ll_username LIKE ? THEN 1 ELSE 2 END as match_priority
+            FROM players
+            WHERE ll_username LIKE ?
+            ORDER BY match_priority, ll_username
+            LIMIT ?
+        """, (f"{q}%", f"%{q}%", limit)).fetchall()
+
+        return {
+            "query": q,
+            "results": [row["ll_username"] for row in rows]
+        }
+
+
 @router.get("/{username}")
 async def get_player(username: str):
     """
