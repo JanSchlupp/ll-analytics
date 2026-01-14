@@ -18,12 +18,46 @@ from ll_analytics.config import Config
 from bs4 import BeautifulSoup
 
 
+def scrape_player_ids(session: LLSession, season: int, rundle: str) -> dict[str, int]:
+    """
+    Scrape player LL IDs from the standings page.
+
+    Returns dict mapping username -> ll_id.
+    """
+    import re
+
+    html = session.get(f'/standings.php?{season}&{rundle}')
+    if not html:
+        return {}
+
+    soup = BeautifulSoup(html, 'lxml')
+    player_ids = {}
+
+    # Find all profile links
+    for link in soup.find_all('a', href=re.compile(r'/profiles\.php\?\d+')):
+        href = link.get('href', '')
+        match = re.search(r'/profiles\.php\?(\d+)', href)
+        if match:
+            ll_id = int(match.group(1))
+            # Get username from the parent cell's text (link is in same cell as username)
+            cell = link.find_parent('td')
+            if cell:
+                username = cell.get_text(strip=True)
+                if username and username not in player_ids:
+                    player_ids[username] = ll_id
+
+    return player_ids
+
+
 def scrape_standings_stats(session: LLSession, season: int, rundle: str) -> list[dict]:
     """
     Scrape aggregate stats from standings_ex.php for all players in a rundle.
 
     Returns list of player stat dictionaries.
     """
+    # First get player IDs from regular standings page
+    player_ids = scrape_player_ids(session, season, rundle)
+
     html = session.get(f'/standings_ex.php?{season}&{rundle}')
     if not html:
         return []
@@ -73,6 +107,7 @@ def scrape_standings_stats(session: LLSession, season: int, rundle: str) -> list
 
                 players.append({
                     'username': username,
+                    'll_id': player_ids.get(username),  # Include LL ID
                     'rank': int(rank) if rank.isdigit() else None,
                     'wins': int(wins) if wins.isdigit() else 0,
                     'losses': int(losses) if losses.isdigit() else 0,
@@ -346,9 +381,14 @@ def scrape_match_details(session: LLSession, ll_match_id: int) -> dict | None:
         return None
 
 
-def scrape_player_profile(session: LLSession, username: str) -> dict | None:
+def scrape_player_profile(session: LLSession, ll_id: int, username: str = None) -> dict | None:
     """
     Scrape a player's profile to get their lifetime category stats.
+
+    Args:
+        session: Authenticated LL session
+        ll_id: The player's numeric LL ID (used in /profiles.php?{ll_id})
+        username: Optional username for logging purposes
 
     Returns {
         'username': str,
@@ -360,65 +400,89 @@ def scrape_player_profile(session: LLSession, username: str) -> dict | None:
     """
     import re
 
+    # Mapping from LL's abbreviated category names to our standard names
+    CATEGORY_MAP = {
+        'AMER HIST': 'American History',
+        'ART': 'Art',
+        'BUS/ECON': 'Business/Economics',
+        'CLASS MUSIC': 'Classical Music',
+        'FILM': 'Film',
+        'FOOD/DRINK': 'Food/Drink',
+        'GAMES/SPORT': 'Games/Sport',
+        'GEOGRAPHY': 'Geography',
+        'LANGUAGE': 'Language',
+        'LIFESTYLE': 'Lifestyle',
+        'LITERATURE': 'Literature',
+        'MATH': 'Math',
+        'POP MUSIC': 'Pop Music',
+        'SCIENCE': 'Science',
+        'TELEVISION': 'Television',
+        'THEATRE': 'Theatre',
+        'WORLD HIST': 'World History',
+        'MISC': 'Miscellaneous',
+    }
+
     try:
-        html = session.get(f'/profiles.php?{username}')
-        if not html or 'Member not found' in html:
+        html = session.get(f'/profiles.php?{ll_id}')
+        if not html or 'Member not found' in html or 'not an active player' in html:
             return None
 
         soup = BeautifulSoup(html, 'lxml')
-
-        # Find the category stats table - look for a table with category names
         categories = []
 
-        # The category stats are in a table with headers like "Category", "Correct", etc.
+        # Find the category table - look for table with "Category" header and "Career" column
         tables = soup.find_all('table')
         for table in tables:
-            # Look for category-related content
-            table_text = table.get_text()
-            if 'American History' in table_text or 'Science' in table_text:
-                rows = table.find_all('tr')
-                for row in rows:
-                    cells = row.find_all(['td', 'th'])
-                    if len(cells) >= 3:
-                        cat_name = cells[0].get_text(strip=True)
-                        # Check if this looks like a category name
-                        if cat_name in ['American History', 'Art', 'Business/Economics', 'Classical Music',
-                                       'Film', 'Food/Drink', 'Games/Sport', 'Geography', 'Language',
-                                       'Lifestyle', 'Literature', 'Math', 'Pop Music', 'Science',
-                                       'Television', 'Theatre', 'World History', 'Miscellaneous']:
-                            # Try to parse correct/total/pct from remaining cells
-                            try:
-                                # Format varies - might be "X/Y (Z%)" or separate columns
-                                stat_text = ' '.join(c.get_text(strip=True) for c in cells[1:])
+            rows = table.find_all('tr')
+            if len(rows) < 2:
+                continue
 
-                                # Try to find pattern like "123/456" or "123" and "456"
-                                nums = re.findall(r'(\d+)', stat_text)
-                                pct_match = re.search(r'(\d+(?:\.\d+)?)\s*%', stat_text)
+            # Check if this is the category table (has Category header)
+            header = rows[0].get_text(strip=True)
+            if 'Category' not in header or 'Career' not in header:
+                continue
 
-                                if len(nums) >= 2:
-                                    correct = int(nums[0])
-                                    total = int(nums[1])
-                                    pct = float(pct_match.group(1)) / 100 if pct_match else (correct / total if total > 0 else 0)
+            # Parse data rows
+            for row in rows[1:]:
+                cells = row.find_all(['td', 'th'])
+                if len(cells) < 3:
+                    continue
 
-                                    categories.append({
-                                        'name': cat_name,
-                                        'correct': correct,
-                                        'total': total,
-                                        'pct': pct,
-                                    })
-                            except:
-                                continue
+                cat_abbrev = cells[0].get_text(strip=True).upper()
+                cat_name = CATEGORY_MAP.get(cat_abbrev)
+                if not cat_name:
+                    continue
+
+                # Career column is typically cells[1], format is "correct-total"
+                career_text = cells[1].get_text(strip=True)
+                match = re.match(r'(\d+)-(\d+)', career_text)
+                if not match:
+                    continue
+
+                correct = int(match.group(1))
+                total = int(match.group(2))
+                pct = correct / total if total > 0 else 0
+
+                categories.append({
+                    'name': cat_name,
+                    'correct': correct,
+                    'total': total,
+                    'pct': pct,
+                })
+
+            # Found the category table, no need to check other tables
+            break
 
         if not categories:
             return None
 
         return {
-            'username': username,
+            'username': username or f'player_{ll_id}',
             'categories': categories,
         }
 
     except Exception as e:
-        print(f"Error scraping profile for {username}: {e}")
+        print(f"Error scraping profile for {username or ll_id}: {e}")
         return None
 
 
@@ -493,10 +557,16 @@ def main():
 
             if player:
                 player_id = player['id']
+                # Update ll_id if we have it and it's not set
+                if p.get('ll_id'):
+                    conn.execute(
+                        "UPDATE players SET ll_id = ? WHERE id = ? AND (ll_id IS NULL OR ll_id != ?)",
+                        (p['ll_id'], player_id, p['ll_id'])
+                    )
             else:
                 cursor = conn.execute(
-                    "INSERT INTO players (ll_username) VALUES (?)",
-                    (p['username'],)
+                    "INSERT INTO players (ll_username, ll_id) VALUES (?, ?)",
+                    (p['username'], p.get('ll_id'))
                 )
                 player_id = cursor.lastrowid
 
@@ -662,9 +732,9 @@ def main():
     # Part 5: Scrape player profiles for lifetime category stats
     print(f"\n=== Scraping player profiles for lifetime category stats ===")
     with get_connection() as conn:
-        # Get all players in the rundle
+        # Get all players in the rundle (with ll_id)
         players = conn.execute("""
-            SELECT p.id, p.ll_username
+            SELECT p.id, p.ll_username, p.ll_id
             FROM players p
             JOIN player_rundles pr ON p.id = pr.player_id
             WHERE pr.rundle_id = ?
@@ -675,7 +745,13 @@ def main():
         category_map = {c['name']: c['id'] for c in categories}
 
         scraped_profiles = 0
+        skipped_no_id = 0
         for i, player in enumerate(players):
+            # Skip if no ll_id
+            if not player['ll_id']:
+                skipped_no_id += 1
+                continue
+
             # Check if already have lifetime stats for this player
             existing = conn.execute(
                 "SELECT COUNT(*) as c FROM player_lifetime_stats WHERE player_id = ?",
@@ -685,7 +761,7 @@ def main():
             if existing >= 15:  # Already have most categories
                 continue
 
-            profile = scrape_player_profile(session, player['ll_username'])
+            profile = scrape_player_profile(session, player['ll_id'], player['ll_username'])
             if profile and profile['categories']:
                 for cat in profile['categories']:
                     cat_id = category_map.get(cat['name'])
@@ -705,6 +781,8 @@ def main():
             time.sleep(1.0)  # Rate limit - be gentle on profile pages
 
         conn.commit()
+        if skipped_no_id > 0:
+            print(f"Skipped {skipped_no_id} players without LL ID")
         print(f"Scraped profiles for {scraped_profiles} players")
 
     # Summary
