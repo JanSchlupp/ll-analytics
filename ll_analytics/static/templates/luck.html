@@ -72,8 +72,8 @@
                 <div class="text-sm text-gray-500">Matches Played</div>
             </div>
             <div class="bg-white rounded-lg shadow p-4 text-center">
-                <div class="text-3xl font-bold" :class="rankColor" x-text="'#' + (rank || '?')"></div>
-                <div class="text-sm text-gray-500">Rundle Rank (Unluckiest)</div>
+                <div class="text-3xl font-bold" :class="rankColor" x-text="'#' + (rank || '?') + '/' + (leaderboard.length || '?')"></div>
+                <div class="text-sm text-gray-500">Luck Rank (1=Luckiest)</div>
             </div>
         </div>
 
@@ -82,11 +82,13 @@
             <h3 class="font-medium text-blue-900 mb-2">How Luck is Calculated</h3>
             <p class="text-blue-800 text-sm">
                 For each match, we compare your opponent's TCA (correct answers) to their season average.
-                If opponents consistently score <strong>above</strong> their average against you, that's unlucky.
-                If they score <strong>below</strong> their average, that's lucky.
+                If opponents consistently score <strong>above</strong> their average against you, that's unlucky (negative luck).
+                If they score <strong>below</strong> their average, that's lucky (positive luck).
             </p>
             <p class="text-blue-800 text-sm mt-2">
-                <strong>Surprise-weighted</strong> luck gives extra weight to unusually extreme performances
+                <strong>Surprise-weighted</strong> luck gives extra weight to extreme opponent performances.
+                If an opponent who averages 4 TCA suddenly gets 6 or 1, that deviation is weighted more heavily than
+                a small deviation like getting 3 or 5. The formula uses z-scores: bigger deviations from average = bigger multiplier
                 (opponents having career days or terrible days).
             </p>
         </div>
@@ -310,10 +312,16 @@ function luckAnalysis() {
         },
 
         renderChart() {
-            if (!this.data.details || this.data.details.length === 0) return;
+            if (!this.data.details || this.data.details.length === 0) {
+                console.log('No data for chart');
+                return;
+            }
 
-            const ctx = document.getElementById('luckChart');
-            if (!ctx) return;
+            const canvas = document.getElementById('luckChart');
+            if (!canvas) {
+                console.log('Canvas not found');
+                return;
+            }
 
             if (this.chart) this.chart.destroy();
 
@@ -324,10 +332,15 @@ function luckAnalysis() {
             let cumulative = 0;
             const cumulativeData = sorted.map(m => {
                 cumulative += m.luck;
-                return cumulative;
+                return Math.round(cumulative * 100) / 100;  // Round to 2 decimal places
             });
 
-            this.chart = new Chart(ctx, {
+            console.log('Chart data:', cumulativeData);
+
+            const lineColor = cumulativeData[cumulativeData.length - 1] < 0 ? 'rgb(239, 68, 68)' : 'rgb(34, 197, 94)';
+            const fillColor = cumulativeData[cumulativeData.length - 1] < 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)';
+
+            this.chart = new Chart(canvas.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: sorted.map(m => 'Day ' + m.match_day),
@@ -335,8 +348,11 @@ function luckAnalysis() {
                         {
                             label: 'Cumulative Luck',
                             data: cumulativeData,
-                            borderColor: cumulativeData[cumulativeData.length - 1] < 0 ? 'rgb(239, 68, 68)' : 'rgb(34, 197, 94)',
-                            backgroundColor: cumulativeData[cumulativeData.length - 1] < 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                            borderColor: lineColor,
+                            backgroundColor: fillColor,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: lineColor,
                             fill: true,
                             tension: 0.3,
                         },
@@ -345,6 +361,9 @@ function luckAnalysis() {
                             data: sorted.map(m => m.luck),
                             borderColor: 'rgb(107, 114, 128)',
                             backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointBackgroundColor: 'rgb(107, 114, 128)',
                             borderDash: [5, 5],
                             tension: 0.1,
                         }

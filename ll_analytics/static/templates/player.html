@@ -46,7 +46,7 @@
         </div>
         <div class="bg-white rounded-lg shadow p-4">
             <div class="text-sm text-gray-500">Match Days</div>
-            <div class="text-2xl font-bold text-gray-900">{{ match_results|length }}</div>
+            <div class="text-2xl font-bold text-gray-900">{{ h2h_matches|length if h2h_matches else match_results|length }}</div>
         </div>
     </div>
 
@@ -335,7 +335,45 @@
 
     <!-- Matches Tab -->
     <div x-show="activeTab === 'matches'">
-        {% if match_results %}
+        {% if h2h_matches %}
+        <!-- Head-to-head match results from matches table -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Opponent</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Result</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Score</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">TCA</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for match in h2h_matches %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 whitespace-nowrap font-medium text-gray-900">{{ match.match_day }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <a href="/player/{{ match.opponent }}" class="text-indigo-600 hover:underline">{{ match.opponent }}</a>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if match.result == 'W' %}bg-green-100 text-green-800
+                                {% elif match.result == 'L' %}bg-red-100 text-red-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ match.result }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-center text-gray-900">
+                            {{ match.my_score }}-{{ match.opp_score }}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-center text-gray-500">{{ match.my_tca }}/6</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% elif match_results %}
+        <!-- Per-question results from answers table -->
         <div class="bg-white rounded-lg shadow overflow-hidden">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
@@ -375,38 +413,69 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Match day performance chart
+    // Match day performance chart - use h2h_matches if available, else match_results
+    const h2hData = {{ h2h_matches | tojson }};
     const matchData = {{ match_results | tojson }};
-    if (matchData.length > 0) {
-        const ctx = document.getElementById('matchDayChart');
-        if (ctx) {
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: matchData.map(m => 'Day ' + m.match_day),
-                    datasets: [{
-                        label: 'Correct Answers',
-                        data: matchData.map(m => m.correct),
-                        backgroundColor: 'rgba(99, 102, 241, 0.8)',
-                        borderColor: 'rgb(99, 102, 241)',
-                        borderWidth: 1
-                    }]
+
+    const ctx = document.getElementById('matchDayChart');
+    if (!ctx) return;
+
+    if (h2hData && h2hData.length > 0) {
+        // Use h2h_matches data (TCA per match day)
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: h2hData.map(m => 'Day ' + m.match_day),
+                datasets: [{
+                    label: 'TCA (Correct Answers)',
+                    data: h2hData.map(m => m.my_tca),
+                    backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                    borderColor: 'rgb(99, 102, 241)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
                 },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 6,
-                            ticks: { stepSize: 1 }
-                        }
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 6,
+                        ticks: { stepSize: 1 }
                     }
                 }
-            });
-        }
+            }
+        });
+    } else if (matchData && matchData.length > 0) {
+        // Use match_results data (from answers table)
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: matchData.map(m => 'Day ' + m.match_day),
+                datasets: [{
+                    label: 'Correct Answers',
+                    data: matchData.map(m => m.correct),
+                    backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                    borderColor: 'rgb(99, 102, 241)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 6,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
     }
 });
 </script>

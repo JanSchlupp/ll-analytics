@@ -180,7 +180,7 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
                 ORDER BY q.match_day
             """, (player["id"], season_row["id"])).fetchall()
 
-        # Get TCA and total
+        # Get TCA and total from answers table
         totals = conn.execute("""
             SELECT
                 COUNT(*) as total_q,
@@ -189,6 +189,42 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
             JOIN questions q ON a.question_id = q.id
             WHERE a.player_id = ? AND q.season_id = ?
         """, (player["id"], season_row["id"])).fetchone() if season_row else None
+
+        # If no answer data, try to get totals from matches table
+        if not totals or totals["total_q"] == 0:
+            match_totals = conn.execute("""
+                SELECT
+                    COUNT(*) * 6 as total_q,
+                    SUM(CASE WHEN player1_id = ? THEN player1_tca ELSE player2_tca END) as tca
+                FROM matches
+                WHERE season_id = ? AND (player1_id = ? OR player2_id = ?)
+            """, (player["id"], season_row["id"], player["id"], player["id"])).fetchone() if season_row else None
+            if match_totals and match_totals["tca"]:
+                totals = match_totals
+
+        # Get head-to-head match history from matches table
+        h2h_matches = []
+        if season_row:
+            h2h_matches = conn.execute("""
+                SELECT
+                    m.match_day,
+                    CASE WHEN m.player1_id = ? THEN m.player1_score ELSE m.player2_score END as my_score,
+                    CASE WHEN m.player1_id = ? THEN m.player2_score ELSE m.player1_score END as opp_score,
+                    CASE WHEN m.player1_id = ? THEN m.player1_tca ELSE m.player2_tca END as my_tca,
+                    CASE WHEN m.player1_id = ? THEN p2.ll_username ELSE p1.ll_username END as opponent,
+                    CASE
+                        WHEN (m.player1_id = ? AND m.player1_score > m.player2_score) OR
+                             (m.player2_id = ? AND m.player2_score > m.player1_score) THEN 'W'
+                        WHEN m.player1_score = m.player2_score THEN 'T'
+                        ELSE 'L'
+                    END as result
+                FROM matches m
+                JOIN players p1 ON m.player1_id = p1.id
+                JOIN players p2 ON m.player2_id = p2.id
+                WHERE m.season_id = ? AND (m.player1_id = ? OR m.player2_id = ?)
+                ORDER BY m.match_day
+            """, (player["id"], player["id"], player["id"], player["id"],
+                  player["id"], player["id"], season_row["id"], player["id"], player["id"])).fetchall()
 
         # Calculate metrics for this player
         metrics_data = {}
@@ -218,6 +254,7 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
             "season": dict(season_row) if season_row else None,
             "category_stats": [dict(c) for c in category_stats],
             "match_results": [dict(m) for m in match_results],
+            "h2h_matches": [dict(m) for m in h2h_matches],
             "totals": dict(totals) if totals else {"total_q": 0, "tca": 0},
             "metrics": metrics_data,
             "all_metrics": MetricRegistry.all_info(),
@@ -302,12 +339,6 @@ async def luck_page(request: Request, username: str, season: Optional[int] = Que
         "season": season_num,
         "rundle": rundle,
     })
-
-
-@app.get("/health")
-async def health():
-    """Health check endpoint."""
-    return {"status": "healthy"}
 
 
 def run_server():
