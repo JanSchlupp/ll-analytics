@@ -251,13 +251,16 @@
 
 {% block scripts %}
 <script>
+// Store chart instance outside Alpine to avoid reactivity issues
+let luckChartInstance = null;
+
 function luckAnalysis() {
     return {
         data: {},
         leaderboard: [],
         loading: true,
-        chart: null,
         rank: null,
+        chartRendered: false,
 
         async init() {
             await Promise.all([
@@ -267,7 +270,7 @@ function luckAnalysis() {
             this.loading = false;
             // Wait for DOM to update after data load
             this.$nextTick(() => {
-                setTimeout(() => this.renderChart(), 100);
+                setTimeout(() => this.renderChart(), 150);
             });
         },
 
@@ -312,6 +315,12 @@ function luckAnalysis() {
         },
 
         renderChart() {
+            // Prevent re-rendering
+            if (this.chartRendered) {
+                console.log('Chart already rendered, skipping');
+                return;
+            }
+
             if (!this.data.details || this.data.details.length === 0) {
                 console.log('No data for chart');
                 return;
@@ -323,7 +332,10 @@ function luckAnalysis() {
                 return;
             }
 
-            if (this.chart) this.chart.destroy();
+            // Destroy existing chart if any
+            if (luckChartInstance) {
+                luckChartInstance.destroy();
+            }
 
             // Sort by match day
             const sorted = [...this.data.details].sort((a, b) => a.match_day - b.match_day);
@@ -332,7 +344,7 @@ function luckAnalysis() {
             let cumulative = 0;
             const cumulativeData = sorted.map(m => {
                 cumulative += m.luck;
-                return Math.round(cumulative * 100) / 100;  // Round to 2 decimal places
+                return Math.round(cumulative * 100) / 100;
             });
 
             console.log('Chart data:', cumulativeData);
@@ -340,7 +352,7 @@ function luckAnalysis() {
             const lineColor = cumulativeData[cumulativeData.length - 1] < 0 ? 'rgb(239, 68, 68)' : 'rgb(34, 197, 94)';
             const fillColor = cumulativeData[cumulativeData.length - 1] < 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)';
 
-            this.chart = new Chart(canvas.getContext('2d'), {
+            luckChartInstance = new Chart(canvas.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: sorted.map(m => 'Day ' + m.match_day),
@@ -385,6 +397,9 @@ function luckAnalysis() {
                     }
                 }
             });
+
+            this.chartRendered = true;
+            console.log('Chart rendered successfully');
         }
     };
 }

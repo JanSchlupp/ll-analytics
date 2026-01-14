@@ -94,19 +94,19 @@ async def home(request: Request, rundle: Optional[int] = Query(None)):
         if not current_rundle and rundles:
             current_rundle = rundles[0]
 
-        # Get standings for selected rundle
+        # Get standings for selected rundle (using matches table for TCA)
         standings = []
         if current_rundle:
             standings = conn.execute("""
                 SELECT
                     p.ll_username,
                     pr.final_rank,
-                    (SELECT COUNT(*) FROM answers a
-                     JOIN questions q ON a.question_id = q.id
-                     WHERE a.player_id = p.id AND q.season_id = ? AND a.correct = 1) as tca,
-                    (SELECT COUNT(*) FROM answers a
-                     JOIN questions q ON a.question_id = q.id
-                     WHERE a.player_id = p.id AND q.season_id = ?) as total_q
+                    (SELECT COALESCE(SUM(CASE WHEN m.player1_id = p.id THEN m.player1_tca ELSE m.player2_tca END), 0)
+                     FROM matches m
+                     WHERE m.season_id = ? AND (m.player1_id = p.id OR m.player2_id = p.id)) as tca,
+                    (SELECT COUNT(*) * 6
+                     FROM matches m
+                     WHERE m.season_id = ? AND (m.player1_id = p.id OR m.player2_id = p.id)) as total_q
                 FROM players p
                 JOIN player_rundles pr ON p.id = pr.player_id
                 WHERE pr.rundle_id = ?
