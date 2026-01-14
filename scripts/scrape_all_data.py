@@ -18,6 +18,63 @@ from ll_analytics.config import Config
 from bs4 import BeautifulSoup
 
 
+def scrape_tracker(session: LLSession, season: int) -> list[dict]:
+    """
+    Scrape the user's player tracker to get tracked players and their rundles.
+
+    Returns list of {'username': str, 'rundle': str, 'll_id': int}
+    """
+    import re
+
+    try:
+        html = session.get('/tracker/tracker.php')
+        if not html or len(html) < 1000:
+            return []
+
+        soup = BeautifulSoup(html, 'lxml')
+        tracked = []
+
+        # Find all player rows in the tracker table
+        # Look for links to standings pages which contain rundle info
+        for link in soup.find_all('a', href=re.compile(r'standings\.php\?\d+&[A-Z]_')):
+            href = link.get('href', '')
+            # Extract season and rundle from URL like /standings.php?107&D_Galaxy_Div_2
+            match = re.search(r'standings\.php\?(\d+)&([A-Za-z0-9_]+)', href)
+            if match:
+                link_season = int(match.group(1))
+                rundle = match.group(2)
+
+                # Only get rundles for the target season
+                if link_season != season:
+                    continue
+
+                # Get player username from link text or nearby cell
+                username = link.get_text(strip=True)
+
+                # Try to find the ll_id from a nearby profile link
+                parent = link.find_parent('tr')
+                ll_id = None
+                if parent:
+                    profile_link = parent.find('a', href=re.compile(r'profiles\.php\?\d+'))
+                    if profile_link:
+                        id_match = re.search(r'profiles\.php\?(\d+)', profile_link.get('href', ''))
+                        if id_match:
+                            ll_id = int(id_match.group(1))
+
+                if username and rundle:
+                    tracked.append({
+                        'username': username,
+                        'rundle': rundle,
+                        'll_id': ll_id
+                    })
+
+        return tracked
+
+    except Exception as e:
+        print(f"Error scraping tracker: {e}")
+        return []
+
+
 def scrape_player_ids(session: LLSession, season: int, rundle: str) -> dict[str, int]:
     """
     Scrape player LL IDs from the standings page.
@@ -120,6 +177,126 @@ def scrape_standings_stats(session: LLSession, season: int, rundle: str) -> list
                 continue
 
     return players
+
+
+def scrape_rundle_matchday(session: LLSession, season: int, match_day: int, rundle: str) -> dict | None:
+    """
+    Scrape the rundle match day page to get ALL players' per-question answers.
+
+    URL format: /match.php?{season}&{day}&{rundle}
+
+    Returns {
+        'questions': [
+            {'num': 1, 'category': 'GEOGRAPHY', 'text': '...', 'answer': '...'},
+            ...
+        ],
+        'player_answers': [
+            {'ll_id': 12345, 'q1_correct': True, 'q1_defense': 0, ...},
+            ...
+        ]
+    }
+    """
+    import re
+
+    try:
+        html = session.get(f'/match.php?{season}&{match_day}&{rundle}')
+        if not html or len(html) < 1000:
+            return None
+
+        soup = BeautifulSoup(html, 'lxml')
+
+        result = {
+            'questions': [],
+            'player_answers': []
+        }
+
+        # Parse questions from qacontainer
+        qa_container = soup.find('div', class_='qacontainer')
+        if qa_container:
+            qa_rows = qa_container.find_all('div', class_='qarow')
+            for row in qa_rows:
+                q_link = row.find('a', href=re.compile(r'question\.php'))
+                if q_link:
+                    # Extract question number from href like /question.php?107&1&3
+                    href = q_link.get('href', '')
+                    q_match = re.search(r'question\.php\?\d+&\d+&(\d+)', href)
+                    q_num = int(q_match.group(1)) if q_match else 0
+
+                    # Get the text content (category and question)
+                    row_text = row.get_text()
+                    # Pattern: Q#. CATEGORY - question text
+                    cat_match = re.search(r'Q\d+\.\s*([A-Z/\s]+)\s*-\s*(.+)', row_text)
+                    if cat_match:
+                        category = cat_match.group(1).strip()
+                        question_text = cat_match.group(2).strip()
+                    else:
+                        category = ''
+                        question_text = row_text
+
+                    # Get answer from div.a-red
+                    answer_div = row.find('div', class_='a-red')
+                    answer = answer_div.get_text(strip=True) if answer_div else ''
+
+                    # Clean up question text (remove answer if it was included)
+                    if answer and answer in question_text:
+                        question_text = question_text.replace(answer, '').strip()
+
+                    result['questions'].append({
+                        'num': q_num,
+                        'category': category,
+                        'text': question_text,
+                        'answer': answer
+                    })
+
+        # Parse player answers from the answers table (table index 1)
+        tables = soup.find_all('table')
+        if len(tables) >= 2:
+            answers_table = tables[1]
+            rows = answers_table.find_all('tr')[1:]  # Skip header
+
+            for row in rows:
+                cells = row.find_all(['td', 'th'])
+                if len(cells) < 8:
+                    continue
+
+                # Get player ll_id from profile link
+                player_cell = cells[7]  # Player column
+                link = player_cell.find('a', href=re.compile(r'profiles\.php'))
+                if not link:
+                    continue
+
+                href = link.get('href', '')
+                id_match = re.search(r'profiles\.php\?(\d+)', href)
+                if not id_match:
+                    continue
+
+                ll_id = int(id_match.group(1))
+
+                # Parse Q1-Q6 answers (first 6 columns)
+                player_data = {'ll_id': ll_id}
+                for q_idx in range(6):
+                    cell = cells[q_idx]
+                    # Defense points are the number
+                    defense = cell.get_text(strip=True)
+                    try:
+                        defense = int(defense)
+                    except:
+                        defense = 0
+
+                    # Correct/incorrect from class (c1=correct, c0=incorrect)
+                    classes = cell.get('class', [])
+                    correct = 'c1' in classes
+
+                    player_data[f'q{q_idx+1}_correct'] = correct
+                    player_data[f'q{q_idx+1}_defense'] = defense
+
+                result['player_answers'].append(player_data)
+
+        return result
+
+    except Exception as e:
+        print(f"Error scraping match day {match_day}: {e}")
+        return None
 
 
 def scrape_my_answers(session: LLSession, season: int) -> list[dict]:
@@ -784,6 +961,133 @@ def main():
         if skipped_no_id > 0:
             print(f"Skipped {skipped_no_id} players without LL ID")
         print(f"Scraped profiles for {scraped_profiles} players")
+
+    # Part 6: Scrape ALL players' answers from rundle match day pages
+    print(f"\n=== Scraping all players' answers from rundle match day pages ===")
+    with get_connection() as conn:
+        # Build ll_id -> player_id mapping
+        players_db = conn.execute("SELECT id, ll_id FROM players WHERE ll_id IS NOT NULL").fetchall()
+        ll_id_to_player = {p['ll_id']: p['id'] for p in players_db}
+
+        # Build category name -> id mapping (for question updates)
+        categories = conn.execute("SELECT id, name FROM categories").fetchall()
+        category_map = {c['name']: c['id'] for c in categories}
+
+        # Also map abbreviated category names
+        CATEGORY_ABBREV_MAP = {
+            'AMER HIST': 'American History',
+            'ART': 'Art',
+            'BUS/ECON': 'Business/Economics',
+            'CLASS MUSIC': 'Classical Music',
+            'FILM': 'Film',
+            'FOOD/DRINK': 'Food/Drink',
+            'GAMES/SPORT': 'Games/Sport',
+            'GEOGRAPHY': 'Geography',
+            'LANGUAGE': 'Language',
+            'LIFESTYLE': 'Lifestyle',
+            'LITERATURE': 'Literature',
+            'MATH': 'Math',
+            'POP MUSIC': 'Pop Music',
+            'SCIENCE': 'Science',
+            'TELEVISION': 'Television',
+            'THEATRE': 'Theatre',
+            'WORLD HIST': 'World History',
+            'MISC': 'Miscellaneous',
+        }
+
+        total_answers_saved = 0
+        total_questions_updated = 0
+
+        # Get players in this rundle
+        rundle_players = conn.execute("""
+            SELECT p.id, p.ll_id FROM players p
+            JOIN player_rundles pr ON p.id = pr.player_id
+            WHERE pr.rundle_id = ?
+        """, (rundle_id,)).fetchall()
+        rundle_player_ids = {p['id'] for p in rundle_players}
+
+        for day in range(1, 26):
+            print(f"  Day {day}...", end=" ", flush=True)
+
+            # Check if we already have answers for this day from players in THIS rundle
+            existing_count = conn.execute("""
+                SELECT COUNT(DISTINCT a.player_id) as c
+                FROM answers a
+                JOIN questions q ON a.question_id = q.id
+                JOIN player_rundles pr ON a.player_id = pr.player_id
+                WHERE q.season_id = ? AND q.match_day = ? AND pr.rundle_id = ?
+            """, (season_id, day, rundle_id)).fetchone()['c']
+
+            if existing_count >= len(rundle_player_ids) - 2:  # Already have most players' answers
+                print(f"already have {existing_count}/{len(rundle_player_ids)} players' answers, skipping")
+                continue
+
+            data = scrape_rundle_matchday(session, season_num, day, target_rundle)
+            if not data:
+                print("no data")
+                continue
+
+            day_answers = 0
+            day_questions = 0
+
+            # Update questions with text and answers
+            for q in data.get('questions', []):
+                q_num = q['num']
+                cat_abbrev = q.get('category', '').strip()
+                cat_name = CATEGORY_ABBREV_MAP.get(cat_abbrev, cat_abbrev)
+                cat_id = category_map.get(cat_name)
+
+                # Update the question record
+                conn.execute("""
+                    UPDATE questions
+                    SET question_text = COALESCE(?, question_text),
+                        correct_answer = COALESCE(?, correct_answer),
+                        category_id = COALESCE(?, category_id)
+                    WHERE season_id = ? AND match_day = ? AND question_number = ?
+                """, (q.get('text'), q.get('answer'), cat_id, season_id, day, q_num))
+                day_questions += 1
+
+            # Get question IDs for this day
+            questions = conn.execute("""
+                SELECT id, question_number FROM questions
+                WHERE season_id = ? AND match_day = ?
+            """, (season_id, day)).fetchall()
+            q_num_to_id = {q['question_number']: q['id'] for q in questions}
+
+            # Save player answers
+            for pa in data.get('player_answers', []):
+                ll_id = pa.get('ll_id')
+                player_id = ll_id_to_player.get(ll_id)
+
+                if not player_id:
+                    continue  # Player not in our database
+
+                for q_num in range(1, 7):
+                    q_id = q_num_to_id.get(q_num)
+                    if not q_id:
+                        continue
+
+                    correct = pa.get(f'q{q_num}_correct', False)
+                    defense = pa.get(f'q{q_num}_defense', 0)
+
+                    try:
+                        conn.execute("""
+                            INSERT OR REPLACE INTO answers
+                            (player_id, question_id, correct, defense_points_assigned)
+                            VALUES (?, ?, ?, ?)
+                        """, (player_id, q_id, correct, defense))
+                        day_answers += 1
+                    except Exception as e:
+                        pass
+
+            conn.commit()
+            total_answers_saved += day_answers
+            total_questions_updated += day_questions
+            print(f"{day_answers} answers, {day_questions} questions updated")
+
+            time.sleep(1.0)  # Rate limit
+
+        print(f"Total: {total_answers_saved} answers saved, {total_questions_updated} questions updated")
 
     # Summary
     print("\n=== Summary ===")
