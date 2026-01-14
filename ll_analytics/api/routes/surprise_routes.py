@@ -76,19 +76,23 @@ async def surprise_distribution(
             player_id = p["id"]
             plev = player_leverage.get(player_id, "low")
 
-            # Get answers for this player
+            # Get answers for this player - use lifetime stats for category %
             answers = conn.execute("""
                 SELECT
                     a.correct,
                     q.match_day,
                     q.rundle_correct_pct,
-                    pcs.correct_pct as player_category_pct
+                    COALESCE(pcs.correct_pct, pls.correct_pct) as player_category_pct
                 FROM answers a
                 JOIN questions q ON a.question_id = q.id
                 LEFT JOIN player_category_stats pcs ON (
                     pcs.player_id = a.player_id
                     AND pcs.category_id = q.category_id
                     AND pcs.season_id = q.season_id
+                )
+                LEFT JOIN player_lifetime_stats pls ON (
+                    pls.player_id = a.player_id
+                    AND pls.category_id = q.category_id
                 )
                 WHERE a.player_id = ? AND q.season_id = ?
                 ORDER BY q.match_day
@@ -170,7 +174,7 @@ async def surprise_questions(
         if not season_row:
             raise HTTPException(status_code=404, detail=f"Season {season} not found")
 
-        # Get all answers with question details
+        # Get all answers with question details - use lifetime stats for category %
         answers = conn.execute("""
             SELECT
                 a.correct,
@@ -180,7 +184,7 @@ async def surprise_questions(
                 q.correct_answer,
                 q.rundle_correct_pct,
                 c.name as category,
-                pcs.correct_pct as player_category_pct
+                COALESCE(pcs.correct_pct, pls.correct_pct) as player_category_pct
             FROM answers a
             JOIN questions q ON a.question_id = q.id
             JOIN categories c ON q.category_id = c.id
@@ -188,6 +192,10 @@ async def surprise_questions(
                 pcs.player_id = a.player_id
                 AND pcs.category_id = q.category_id
                 AND pcs.season_id = q.season_id
+            )
+            LEFT JOIN player_lifetime_stats pls ON (
+                pls.player_id = a.player_id
+                AND pls.category_id = q.category_id
             )
             WHERE a.player_id = ? AND q.season_id = ?
             ORDER BY q.match_day, q.question_number

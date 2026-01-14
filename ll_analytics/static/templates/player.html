@@ -146,9 +146,13 @@
                         <span class="text-xl font-bold {% if metric.result.data.get('total_surprise', 0) > 0 %}text-green-600{% elif metric.result.data.get('total_surprise', 0) < 0 %}text-red-600{% else %}text-gray-600{% endif %}">
                             {{ "%+.2f"|format(metric.result.data.get('total_surprise', 0)) }}
                         </span>
-                        {% elif metric.result.data.get('early_pct') is not none %}
+                        {% elif metric.result.data.get('early') is not none %}
                         <span class="text-xl font-bold {% if metric.result.data.get('z_score', 0) > 1.5 %}text-orange-600{% elif metric.result.data.get('z_score', 0) < -1.5 %}text-blue-600{% else %}text-gray-600{% endif %}">
                             {% if metric.result.data.get('z_score', 0) > 0 %}+{% endif %}{{ "%.2f"|format(metric.result.data.get('z_score', 0)) }} z
+                        </span>
+                        {% elif metric.result.data.get('total_luck') is not none %}
+                        <span class="text-xl font-bold {% if metric.result.data.get('total_luck', 0) > 0 %}text-green-600{% elif metric.result.data.get('total_luck', 0) < 0 %}text-red-600{% else %}text-gray-600{% endif %}">
+                            {{ "%+.1f"|format(metric.result.data.get('total_luck', 0)) }}
                         </span>
                         {% endif %}
                     {% endif %}
