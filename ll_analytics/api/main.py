@@ -154,7 +154,7 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
                 "SELECT * FROM seasons ORDER BY season_number DESC LIMIT 1"
             ).fetchone()
 
-        # Get player's category stats
+        # Get player's category stats (try season-specific first, then lifetime)
         category_stats = []
         if season_row:
             category_stats = conn.execute("""
@@ -164,6 +164,16 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
                 WHERE pcs.player_id = ? AND pcs.season_id = ?
                 ORDER BY pcs.correct_pct DESC
             """, (player["id"], season_row["id"])).fetchall()
+
+        # Fall back to lifetime stats if no season-specific stats
+        if not category_stats:
+            category_stats = conn.execute("""
+                SELECT c.name, pls.correct_pct, pls.total_questions
+                FROM player_lifetime_stats pls
+                JOIN categories c ON pls.category_id = c.id
+                WHERE pls.player_id = ?
+                ORDER BY pls.correct_pct DESC
+            """, (player["id"],)).fetchall()
 
         # Get match day results
         match_results = []

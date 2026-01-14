@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS player_rundles (
     PRIMARY KEY (player_id, rundle_id)
 );
 
--- Historical category performance
+-- Historical category performance (season-specific)
 CREATE TABLE IF NOT EXISTS player_category_stats (
     player_id INTEGER NOT NULL REFERENCES players(id),
     category_id INTEGER NOT NULL REFERENCES categories(id),
@@ -55,6 +55,16 @@ CREATE TABLE IF NOT EXISTS player_category_stats (
     correct_pct REAL,
     total_questions INTEGER,
     PRIMARY KEY (player_id, category_id, season_id)
+);
+
+-- Lifetime category performance (from player profiles)
+CREATE TABLE IF NOT EXISTS player_lifetime_stats (
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    category_id INTEGER NOT NULL REFERENCES categories(id),
+    correct_pct REAL,
+    total_questions INTEGER,
+    scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (player_id, category_id)
 );
 
 -- Questions
@@ -101,6 +111,8 @@ CREATE TABLE IF NOT EXISTS match_questions (
     match_id INTEGER NOT NULL REFERENCES matches(id),
     question_num INTEGER NOT NULL,  -- 1-6
     question_id INTEGER REFERENCES questions(id),  -- Links to full question data
+    category_id INTEGER REFERENCES categories(id),  -- Question category
+    question_ca_pct REAL,  -- Correct answer % for this question (difficulty)
     player1_correct BOOLEAN NOT NULL,
     player2_correct BOOLEAN NOT NULL,
     player1_defense INTEGER NOT NULL,  -- Defense pts player2 assigned to player1
@@ -122,6 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_answers_player ON answers(player_id);
 CREATE INDEX IF NOT EXISTS idx_answers_question ON answers(question_id);
 CREATE INDEX IF NOT EXISTS idx_questions_season_day ON questions(season_id, match_day);
 CREATE INDEX IF NOT EXISTS idx_player_category_stats_player ON player_category_stats(player_id);
+CREATE INDEX IF NOT EXISTS idx_player_lifetime_stats_player ON player_lifetime_stats(player_id);
 CREATE INDEX IF NOT EXISTS idx_matches_season_day ON matches(season_id, match_day);
 CREATE INDEX IF NOT EXISTS idx_match_questions_match ON match_questions(match_id);
 """

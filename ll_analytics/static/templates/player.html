@@ -84,20 +84,21 @@
             <canvas id="matchDayChart" height="200"></canvas>
         </div>
 
-        <!-- Category Strengths (Top 5) -->
+        <!-- All Category Stats -->
         {% if category_stats %}
         <div class="bg-white rounded-lg shadow p-4">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Category Strengths</h3>
-            <div class="space-y-3">
-                {% for cat in category_stats[:5] %}
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Category Performance (Lifetime)</h3>
+            <div class="space-y-2 max-h-96 overflow-y-auto">
+                {% for cat in category_stats %}
                 <div class="flex items-center">
-                    <span class="w-32 text-sm text-gray-600">{{ cat.name }}</span>
-                    <div class="flex-1 mx-4">
-                        <div class="bg-gray-200 rounded-full h-4">
-                            <div class="bg-indigo-600 h-4 rounded-full" style="width: {{ (cat.correct_pct or 0) * 100 }}%"></div>
+                    <span class="w-36 text-sm text-gray-600 truncate" title="{{ cat.name }}">{{ cat.name }}</span>
+                    <div class="flex-1 mx-3">
+                        <div class="bg-gray-200 rounded-full h-3">
+                            <div class="{% if (cat.correct_pct or 0) >= 0.6 %}bg-green-500{% elif (cat.correct_pct or 0) >= 0.4 %}bg-yellow-500{% else %}bg-red-500{% endif %} h-3 rounded-full" style="width: {{ (cat.correct_pct or 0) * 100 }}%"></div>
                         </div>
                     </div>
-                    <span class="text-sm font-medium text-gray-900">{{ "%.0f"|format((cat.correct_pct or 0) * 100) }}%</span>
+                    <span class="text-sm font-medium text-gray-900 w-12 text-right">{{ "%.0f"|format((cat.correct_pct or 0) * 100) }}%</span>
+                    <span class="text-xs text-gray-400 w-16 text-right">({{ cat.total_questions or 0 }})</span>
                 </div>
                 {% endfor %}
             </div>

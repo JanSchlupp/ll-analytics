@@ -247,7 +247,8 @@ def scrape_match_details(session: LLSession, ll_match_id: int) -> dict | None:
     Returns {
         'player1': str, 'player2': str,
         'questions': [
-            {'q_num': 1, 'p1_correct': bool, 'p2_correct': bool, 'p1_defense': int, 'p2_defense': int},
+            {'q_num': 1, 'p1_correct': bool, 'p2_correct': bool, 'p1_defense': int, 'p2_defense': int,
+             'category': str, 'ca_pct': float},
             ...
         ]
     }
@@ -299,6 +300,16 @@ def scrape_match_details(session: LLSession, ll_match_id: int) -> dict | None:
             if len(cells) < 4:
                 continue
 
+            # Cell 0 has category, Cell 1 has CA%
+            category = cells[0].get_text(strip=True) if len(cells) > 0 else None
+            ca_pct_text = cells[1].get_text(strip=True) if len(cells) > 1 else None
+            ca_pct = None
+            if ca_pct_text:
+                # Parse "45%" to 0.45
+                ca_match = re.search(r'(\d+)%', ca_pct_text)
+                if ca_match:
+                    ca_pct = int(ca_match.group(1)) / 100.0
+
             # Cell 2 is player1's result, Cell 3 is player2's result
             # Class 'ind-Yes2' = correct, 'ind-No2' = incorrect
             p1_cell = cells[2]
@@ -320,6 +331,8 @@ def scrape_match_details(session: LLSession, ll_match_id: int) -> dict | None:
                 'p2_correct': p2_correct,
                 'p1_defense': p1_defense,
                 'p2_defense': p2_defense,
+                'category': category,
+                'ca_pct': ca_pct,
             })
 
         return {
@@ -330,6 +343,82 @@ def scrape_match_details(session: LLSession, ll_match_id: int) -> dict | None:
 
     except Exception as e:
         print(f"Error scraping match {ll_match_id}: {e}")
+        return None
+
+
+def scrape_player_profile(session: LLSession, username: str) -> dict | None:
+    """
+    Scrape a player's profile to get their lifetime category stats.
+
+    Returns {
+        'username': str,
+        'categories': [
+            {'name': str, 'correct': int, 'total': int, 'pct': float},
+            ...
+        ]
+    }
+    """
+    import re
+
+    try:
+        html = session.get(f'/profiles.php?{username}')
+        if not html or 'Member not found' in html:
+            return None
+
+        soup = BeautifulSoup(html, 'lxml')
+
+        # Find the category stats table - look for a table with category names
+        categories = []
+
+        # The category stats are in a table with headers like "Category", "Correct", etc.
+        tables = soup.find_all('table')
+        for table in tables:
+            # Look for category-related content
+            table_text = table.get_text()
+            if 'American History' in table_text or 'Science' in table_text:
+                rows = table.find_all('tr')
+                for row in rows:
+                    cells = row.find_all(['td', 'th'])
+                    if len(cells) >= 3:
+                        cat_name = cells[0].get_text(strip=True)
+                        # Check if this looks like a category name
+                        if cat_name in ['American History', 'Art', 'Business/Economics', 'Classical Music',
+                                       'Film', 'Food/Drink', 'Games/Sport', 'Geography', 'Language',
+                                       'Lifestyle', 'Literature', 'Math', 'Pop Music', 'Science',
+                                       'Television', 'Theatre', 'World History', 'Miscellaneous']:
+                            # Try to parse correct/total/pct from remaining cells
+                            try:
+                                # Format varies - might be "X/Y (Z%)" or separate columns
+                                stat_text = ' '.join(c.get_text(strip=True) for c in cells[1:])
+
+                                # Try to find pattern like "123/456" or "123" and "456"
+                                nums = re.findall(r'(\d+)', stat_text)
+                                pct_match = re.search(r'(\d+(?:\.\d+)?)\s*%', stat_text)
+
+                                if len(nums) >= 2:
+                                    correct = int(nums[0])
+                                    total = int(nums[1])
+                                    pct = float(pct_match.group(1)) / 100 if pct_match else (correct / total if total > 0 else 0)
+
+                                    categories.append({
+                                        'name': cat_name,
+                                        'correct': correct,
+                                        'total': total,
+                                        'pct': pct,
+                                    })
+                            except:
+                                continue
+
+        if not categories:
+            return None
+
+        return {
+            'username': username,
+            'categories': categories,
+        }
+
+    except Exception as e:
+        print(f"Error scraping profile for {username}: {e}")
         return None
 
 
@@ -527,26 +616,38 @@ def main():
     # Part 4: Scrape per-question details for all matches
     print(f"\n=== Scraping per-question details for {len(match_ids_to_scrape)} matches ===")
     with get_connection() as conn:
-        scraped_details = 0
-        for i, (db_match_id, ll_match_id) in enumerate(match_ids_to_scrape):
-            # Check if already scraped
-            existing = conn.execute(
-                "SELECT COUNT(*) as c FROM match_questions WHERE match_id = ?",
-                (db_match_id,)
-            ).fetchone()['c']
+        # Build category name -> id mapping
+        categories = conn.execute("SELECT id, name FROM categories").fetchall()
+        category_map = {c['name']: c['id'] for c in categories}
 
-            if existing > 0:
-                continue  # Already have per-question data
+        scraped_details = 0
+        updated_details = 0
+        for i, (db_match_id, ll_match_id) in enumerate(match_ids_to_scrape):
+            # Check if already scraped with category data
+            existing = conn.execute(
+                "SELECT COUNT(*) as c, SUM(CASE WHEN category_id IS NOT NULL THEN 1 ELSE 0 END) as with_cat FROM match_questions WHERE match_id = ?",
+                (db_match_id,)
+            ).fetchone()
+
+            if existing['c'] > 0 and existing['with_cat'] == existing['c']:
+                continue  # Already have complete per-question data
 
             details = scrape_match_details(session, ll_match_id)
             if details and details['questions']:
                 for q in details['questions']:
+                    # Get category_id from category name
+                    category_id = category_map.get(q.get('category')) if q.get('category') else None
+
                     conn.execute("""
                         INSERT OR REPLACE INTO match_questions
-                        (match_id, question_num, player1_correct, player2_correct, player1_defense, player2_defense)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """, (db_match_id, q['q_num'], q['p1_correct'], q['p2_correct'], q['p1_defense'], q['p2_defense']))
-                scraped_details += 1
+                        (match_id, question_num, player1_correct, player2_correct, player1_defense, player2_defense, category_id, question_ca_pct)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (db_match_id, q['q_num'], q['p1_correct'], q['p2_correct'], q['p1_defense'], q['p2_defense'], category_id, q.get('ca_pct')))
+
+                if existing['c'] > 0:
+                    updated_details += 1
+                else:
+                    scraped_details += 1
 
             if (i + 1) % 50 == 0:
                 print(f"  Scraped {i + 1}/{len(match_ids_to_scrape)} matches...")
@@ -556,6 +657,55 @@ def main():
 
         conn.commit()
         print(f"Scraped per-question details for {scraped_details} new matches")
+        print(f"Updated {updated_details} matches with category/CA% data")
+
+    # Part 5: Scrape player profiles for lifetime category stats
+    print(f"\n=== Scraping player profiles for lifetime category stats ===")
+    with get_connection() as conn:
+        # Get all players in the rundle
+        players = conn.execute("""
+            SELECT p.id, p.ll_username
+            FROM players p
+            JOIN player_rundles pr ON p.id = pr.player_id
+            WHERE pr.rundle_id = ?
+        """, (rundle_id,)).fetchall()
+
+        # Build category name -> id mapping
+        categories = conn.execute("SELECT id, name FROM categories").fetchall()
+        category_map = {c['name']: c['id'] for c in categories}
+
+        scraped_profiles = 0
+        for i, player in enumerate(players):
+            # Check if already have lifetime stats for this player
+            existing = conn.execute(
+                "SELECT COUNT(*) as c FROM player_lifetime_stats WHERE player_id = ?",
+                (player['id'],)
+            ).fetchone()['c']
+
+            if existing >= 15:  # Already have most categories
+                continue
+
+            profile = scrape_player_profile(session, player['ll_username'])
+            if profile and profile['categories']:
+                for cat in profile['categories']:
+                    cat_id = category_map.get(cat['name'])
+                    if cat_id:
+                        conn.execute("""
+                            INSERT OR REPLACE INTO player_lifetime_stats
+                            (player_id, category_id, correct_pct, total_questions)
+                            VALUES (?, ?, ?, ?)
+                        """, (player['id'], cat_id, cat['pct'], cat['total']))
+
+                scraped_profiles += 1
+                print(f"  {player['ll_username']}: {len(profile['categories'])} categories")
+
+            if (i + 1) % 10 == 0:
+                conn.commit()
+
+            time.sleep(1.0)  # Rate limit - be gentle on profile pages
+
+        conn.commit()
+        print(f"Scraped profiles for {scraped_profiles} players")
 
     # Summary
     print("\n=== Summary ===")
@@ -574,9 +724,21 @@ def main():
             SELECT COUNT(*) as c FROM matches WHERE season_id = ?
         """, (season_id,)).fetchone()['c']
 
+        total_match_questions = conn.execute("""
+            SELECT COUNT(*) as c FROM match_questions mq
+            JOIN matches m ON mq.match_id = m.id
+            WHERE m.season_id = ?
+        """, (season_id,)).fetchone()['c']
+
+        players_with_lifetime = conn.execute("""
+            SELECT COUNT(DISTINCT player_id) as c FROM player_lifetime_stats
+        """).fetchone()['c']
+
         print(f"Players in {target_rundle}: {total_players}")
         print(f"Total answers in database: {total_answers}")
         print(f"Total matches in database: {total_matches}")
+        print(f"Total match questions: {total_match_questions}")
+        print(f"Players with lifetime stats: {players_with_lifetime}")
 
     print("\nDone!")
 
