@@ -246,27 +246,31 @@
                 </div>
 
                 <!-- Late Spike Metric Details -->
-                {% elif metric_id == 'late_spike' and metric.result.data.get('early_pct') is not none %}
+                {% elif metric_id == 'late_spike' and metric.result.data.get('early') is not none %}
                 <div class="space-y-4">
                     <div class="grid grid-cols-4 gap-4 text-center">
                         <div>
-                            <div class="text-2xl font-bold text-gray-900">{{ "%.1f"|format(metric.result.data.get('early_pct', 0) * 100) }}%</div>
-                            <div class="text-sm text-gray-500">Early (Days 1-10)</div>
+                            <div class="text-2xl font-bold text-gray-900">{{ "%.3f"|format(metric.result.data.get('early', {}).get('avg_surprise', 0)) }}</div>
+                            <div class="text-sm text-gray-500">Early Avg (Days 1-10)</div>
                         </div>
                         <div>
-                            <div class="text-2xl font-bold text-gray-900">{{ "%.1f"|format(metric.result.data.get('late_pct', 0) * 100) }}%</div>
-                            <div class="text-sm text-gray-500">Late (Days 20-25)</div>
+                            <div class="text-2xl font-bold text-gray-900">{{ "%.3f"|format(metric.result.data.get('late', {}).get('avg_surprise', 0)) }}</div>
+                            <div class="text-sm text-gray-500">Late Avg (Days 20-25)</div>
                         </div>
                         <div>
-                            <div class="text-2xl font-bold {% if metric.result.data.get('change', 0) > 0 %}text-green-600{% elif metric.result.data.get('change', 0) < 0 %}text-red-600{% endif %}">
-                                {{ "%+.1f"|format(metric.result.data.get('change', 0) * 100) }}%
+                            <div class="text-2xl font-bold {% if metric.result.data.get('delta', 0) > 0 %}text-green-600{% elif metric.result.data.get('delta', 0) < 0 %}text-red-600{% endif %}">
+                                {{ "%+.3f"|format(metric.result.data.get('delta', 0)) }}
                             </div>
-                            <div class="text-sm text-gray-500">Change</div>
+                            <div class="text-sm text-gray-500">Delta</div>
                         </div>
                         <div>
+                            {% if metric.result.data.get('z_score') is not none %}
                             <div class="text-2xl font-bold {% if metric.result.data.get('z_score', 0) > 1.5 %}text-orange-600{% elif metric.result.data.get('z_score', 0) < -1.5 %}text-blue-600{% endif %}">
                                 {{ "%.2f"|format(metric.result.data.get('z_score', 0)) }}
                             </div>
+                            {% else %}
+                            <div class="text-2xl font-bold text-gray-400">N/A</div>
+                            {% endif %}
                             <div class="text-sm text-gray-500">Z-Score</div>
                         </div>
                     </div>
@@ -274,16 +278,59 @@
                     <div class="mt-4">
                         <h4 class="font-medium text-gray-900 mb-2">What This Means</h4>
                         <p class="text-sm text-gray-600">
-                            This metric compares your correct answer percentage in the early part of the season (days 1-10)
-                            versus the late part (days 20-25).
+                            This metric compares your average surprise (performance vs expectation) in the early season
+                            (days 1-10) versus the late season (days 20-25).
                         </p>
                         <ul class="text-sm text-gray-600 list-disc ml-5 mt-2 space-y-1">
-                            <li><strong>Z-Score > 1.5:</strong> Unusually large late-season improvement</li>
-                            <li><strong>Z-Score between -1.5 and 1.5:</strong> Normal variation</li>
-                            <li><strong>Z-Score < -1.5:</strong> Unusually large late-season decline</li>
+                            <li><strong>Positive delta:</strong> You performed better than expected late in the season</li>
+                            <li><strong>Z-Score > 1.96:</strong> Statistically significant improvement</li>
+                            <li><strong>Z-Score < -1.96:</strong> Statistically significant decline</li>
                         </ul>
+                        <p class="text-sm text-gray-500 mt-2">
+                            Based on {{ metric.result.data.get('early', {}).get('questions', 0) }} early questions and
+                            {{ metric.result.data.get('late', {}).get('questions', 0) }} late questions.
+                        </p>
                     </div>
                 </div>
+                <!-- Luck Metric -->
+                {% elif metric_id == 'luck' and metric.result.data.get('total_luck') is not none %}
+                <div class="space-y-4">
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div class="text-2xl font-bold {% if metric.result.data.get('total_luck', 0) > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                                {{ "%+.1f"|format(metric.result.data.get('total_luck', 0)) }}
+                            </div>
+                            <div class="text-sm text-gray-500">Total Luck</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold {% if metric.result.data.get('total_weighted_luck', 0) > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                                {{ "%+.1f"|format(metric.result.data.get('total_weighted_luck', 0)) }}
+                            </div>
+                            <div class="text-sm text-gray-500">Weighted Luck</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-gray-900">{{ metric.result.data.get('matches_played', 0) }}</div>
+                            <div class="text-sm text-gray-500">Matches</div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600">
+                        {% if metric.result.data.get('total_luck', 0) < -10 %}
+                        Opponents have consistently overperformed against you - that's unlucky!
+                        {% elif metric.result.data.get('total_luck', 0) > 10 %}
+                        Opponents have consistently underperformed against you - that's lucky!
+                        {% else %}
+                        Opponent performance has been roughly average against you.
+                        {% endif %}
+                    </p>
+                    <a href="/luck/{{ player.ll_username }}?season={{ season.season_number }}"
+                       class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700">
+                        View Full Luck Analysis
+                        <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
+                    </a>
+                </div>
+
                 {% else %}
                 <!-- Generic metric data display -->
                 <pre class="text-xs bg-gray-100 p-2 rounded overflow-x-auto">{{ metric.result.data | tojson(indent=2) }}</pre>
