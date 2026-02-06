@@ -163,3 +163,25 @@ body {
     opacity: 1;
     visibility: visible;
 }
+
+/* Heatmap cells */
+.heatmap-cell {
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.heatmap-cell:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.heatmap-correct {
+    background-color: #22c55e;
+}
+
+.heatmap-incorrect {
+    background-color: #ef4444;
+}
+
+.heatmap-no-data {
+    background-color: #e5e7eb;
+}

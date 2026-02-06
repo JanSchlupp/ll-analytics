@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Category Difficulty Heatmap - LL Analytics{% endblock %}
+
+{% block content %}
+<div x-data="categoryHeatmap()">
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Category Difficulty Heatmap</h1>
+        <p class="text-gray-600 mt-1">Season {{ season }} - Average CA% by category and match day</p>
+    </div>
+
+    <!-- Legend -->
+    <div class="flex gap-4 mb-4 text-sm items-center">
+        <span class="text-gray-600">Difficulty:</span>
+        <div class="flex items-center gap-1">
+            <div class="w-5 h-5 rounded" style="background-color: #ef4444;"></div>
+            <span>Hard (0%)</span>
+        </div>
+        <div class="flex items-center gap-1">
+            <div class="w-5 h-5 rounded" style="background-color: #eab308;"></div>
+            <span>Medium (50%)</span>
+        </div>
+        <div class="flex items-center gap-1">
+            <div class="w-5 h-5 rounded" style="background-color: #22c55e;"></div>
+            <span>Easy (100%)</span>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div x-show="loading" class="flex justify-center py-12">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Heatmap -->
+    <div x-show="!loading" x-cloak class="bg-white rounded-lg shadow overflow-auto">
+        <table class="min-w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10" style="min-width: 150px;">Category</th>
+                    <template x-for="day in days" :key="day">
+                        <th class="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase" x-text="day" style="min-width: 40px;"></th>
+                    </template>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                <template x-for="cat in categories" :key="cat">
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 text-sm font-medium text-gray-900 whitespace-nowrap sticky left-0 bg-white z-10" x-text="cat"></td>
+                        <template x-for="day in days" :key="day">
+                            <td class="px-1 py-1 text-center">
+                                <div
+                                    class="w-8 h-8 rounded mx-auto heatmap-cell tooltip"
+                                    :style="getCellStyle(cat, day)"
+                                    :data-tooltip="getCellTooltip(cat, day)"
+                                ></div>
+                            </td>
+                        </template>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function categoryHeatmap() {
+    // Use the ordered categories from Jinja
+    const orderedCategories = {{ categories | tojson }};
+
+    return {
+        data: {},
+        categories: orderedCategories,
+        days: [],
+        loading: true,
+
+        async init() {
+            try {
+                const resp = await fetch('/api/categories/heatmap?season={{ season }}');
+                const json = await resp.json();
+                this.data = json.data || {};
+
+                // Build sorted day list from data
+                const daySet = new Set();
+                for (const cat of Object.values(this.data)) {
+                    for (const d of Object.keys(cat)) daySet.add(parseInt(d));
+                }
+                this.days = [...daySet].sort((a, b) => a - b);
+
+                // Filter categories to only those present in data, preserving order
+                const dataCats = new Set(Object.keys(this.data));
+                this.categories = orderedCategories.filter(c => dataCats.has(c));
+            } catch (e) {
+                console.error('Failed to load category heatmap:', e);
+            }
+            this.loading = false;
+        },
+
+        getCellValue(cat, day) {
+            return this.data[cat]?.[String(day)] ?? null;
+        },
+
+        getCellStyle(cat, day) {
+            const val = this.getCellValue(cat, day);
+            if (val === null) return 'background-color: #e5e7eb;';
+            // Red (0%) -> Yellow (50%) -> Green (100%)
+            const pct = val;
+            let r, g, b;
+            if (pct < 0.5) {
+                // Red to Yellow
+                const t = pct / 0.5;
+                r = 239;
+                g = Math.round(68 + (179 - 68) * t);
+                b = Math.round(68 * (1 - t));
+            } else {
+                // Yellow to Green
+                const t = (pct - 0.5) / 0.5;
+                r = Math.round(234 - (234 - 34) * t);
+                g = Math.round(179 + (197 - 179) * t);
+                b = Math.round(0 + 94 * t);
+            }
+            return `background-color: rgb(${r}, ${g}, ${b});`;
+        },
+
+        getCellTooltip(cat, day) {
+            const val = this.getCellValue(cat, day);
+            if (val === null) return 'No data';
+            return `${cat} Day ${day}: ${(val * 100).toFixed(0)}% CA`;
+        },
+    };
+}
+</script>
+{% endblock %}

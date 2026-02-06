@@ -1,21 +1,21 @@
 """Main FastAPI application."""
 
-from typing import Optional
-from fastapi import FastAPI, Request, Query
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse
 from pathlib import Path
 
 from ..config import Config
-from ..database import get_connection, init_db
-from ..metrics import MetricRegistry, Scope
-from .routes import players, seasons, metrics, surprise_routes, luck_routes
+from ..logging import setup_logging, get_logger
+from ..database import init_db
+
+setup_logging(Config.LOG_LEVEL, Config.LOG_FILE)
+from .routes import players, seasons, metrics, surprise_routes, luck_routes, pages, heatmap_routes
+
+logger = get_logger(__name__)
 
 # Get paths
 BASE_DIR = Path(__file__).parent.parent
 STATIC_DIR = BASE_DIR / "static"
-TEMPLATES_DIR = STATIC_DIR / "templates"
 
 # Create FastAPI app
 app = FastAPI(
@@ -28,15 +28,14 @@ app = FastAPI(
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Set up templates
-templates = Jinja2Templates(directory=TEMPLATES_DIR) if TEMPLATES_DIR.exists() else None
-
 # Include routers
 app.include_router(players.router, prefix="/api/players", tags=["Players"])
 app.include_router(seasons.router, prefix="/api/seasons", tags=["Seasons"])
 app.include_router(metrics.router, prefix="/api/metrics", tags=["Metrics"])
 app.include_router(surprise_routes.router, prefix="/api/metrics", tags=["Surprise"])
 app.include_router(luck_routes.router, prefix="/api", tags=["Luck"])
+app.include_router(heatmap_routes.router, tags=["Heatmaps"])
+app.include_router(pages.router, tags=["Pages"])
 
 
 @app.on_event("startup")
@@ -49,306 +48,6 @@ async def startup_event():
 async def health_check():
     """Health check endpoint for Render."""
     return {"status": "healthy"}
-
-
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request, rundle: Optional[int] = Query(None)):
-    """Homepage - Rundle standings."""
-    if not templates:
-        return RedirectResponse("/docs")
-
-    with get_connection() as conn:
-        # Get most recent season
-        season = conn.execute(
-            "SELECT * FROM seasons ORDER BY season_number DESC LIMIT 1"
-        ).fetchone()
-
-        if not season:
-            return templates.TemplateResponse("home.html", {
-                "request": request,
-                "season": None,
-                "rundles": [],
-                "standings": [],
-                "metrics": [],
-            })
-
-        # Get rundles for this season
-        rundles = conn.execute(
-            "SELECT * FROM rundles WHERE season_id = ? ORDER BY level, name",
-            (season["id"],)
-        ).fetchall()
-
-        # Select rundle based on query param or default to C_Skyline
-        current_rundle = None
-        if rundle:
-            for r in rundles:
-                if r["id"] == rundle:
-                    current_rundle = r
-                    break
-
-        if not current_rundle:
-            for r in rundles:
-                if r["name"] == "C_Skyline":
-                    current_rundle = r
-                    break
-        if not current_rundle and rundles:
-            current_rundle = rundles[0]
-
-        # Get standings for selected rundle (using matches table for TCA)
-        standings = []
-        if current_rundle:
-            standings = conn.execute("""
-                SELECT
-                    p.ll_username,
-                    pr.final_rank,
-                    (SELECT COALESCE(SUM(CASE WHEN m.player1_id = p.id THEN m.player1_tca ELSE m.player2_tca END), 0)
-                     FROM matches m
-                     WHERE m.season_id = ? AND (m.player1_id = p.id OR m.player2_id = p.id)) as tca,
-                    (SELECT COUNT(*) * 6
-                     FROM matches m
-                     WHERE m.season_id = ? AND (m.player1_id = p.id OR m.player2_id = p.id)) as total_q
-                FROM players p
-                JOIN player_rundles pr ON p.id = pr.player_id
-                WHERE pr.rundle_id = ?
-                ORDER BY pr.final_rank
-            """, (season["id"], season["id"], current_rundle["id"])).fetchall()
-
-        return templates.TemplateResponse("home.html", {
-            "request": request,
-            "season": dict(season),
-            "rundles": [dict(r) for r in rundles],
-            "current_rundle": dict(current_rundle) if current_rundle else None,
-            "standings": [dict(s) for s in standings],
-            "metrics": MetricRegistry.all_info(),
-        })
-
-
-@app.get("/player/{username}", response_class=HTMLResponse)
-async def player_profile(request: Request, username: str, season: Optional[int] = Query(None)):
-    """Player profile page with metrics."""
-    if not templates:
-        return RedirectResponse(f"/api/players/{username}")
-
-    with get_connection() as conn:
-        # Get player
-        player = conn.execute(
-            "SELECT * FROM players WHERE ll_username = ?",
-            (username,)
-        ).fetchone()
-
-        if not player:
-            return templates.TemplateResponse("player.html", {
-                "request": request,
-                "player": None,
-                "error": f"Player '{username}' not found",
-            })
-
-        # Get season (most recent if not specified)
-        if season:
-            season_row = conn.execute(
-                "SELECT * FROM seasons WHERE season_number = ?",
-                (season,)
-            ).fetchone()
-        else:
-            season_row = conn.execute(
-                "SELECT * FROM seasons ORDER BY season_number DESC LIMIT 1"
-            ).fetchone()
-
-        # Get player's category stats (try season-specific first, then lifetime)
-        category_stats = []
-        if season_row:
-            category_stats = conn.execute("""
-                SELECT c.name, pcs.correct_pct, pcs.total_questions
-                FROM player_category_stats pcs
-                JOIN categories c ON pcs.category_id = c.id
-                WHERE pcs.player_id = ? AND pcs.season_id = ?
-                ORDER BY pcs.correct_pct DESC
-            """, (player["id"], season_row["id"])).fetchall()
-
-        # Fall back to lifetime stats if no season-specific stats
-        if not category_stats:
-            category_stats = conn.execute("""
-                SELECT c.name, pls.correct_pct, pls.total_questions
-                FROM player_lifetime_stats pls
-                JOIN categories c ON pls.category_id = c.id
-                WHERE pls.player_id = ?
-                ORDER BY pls.correct_pct DESC
-            """, (player["id"],)).fetchall()
-
-        # Get match day results
-        match_results = []
-        if season_row:
-            match_results = conn.execute("""
-                SELECT
-                    q.match_day,
-                    COUNT(*) as questions,
-                    SUM(CASE WHEN a.correct THEN 1 ELSE 0 END) as correct
-                FROM answers a
-                JOIN questions q ON a.question_id = q.id
-                WHERE a.player_id = ? AND q.season_id = ?
-                GROUP BY q.match_day
-                ORDER BY q.match_day
-            """, (player["id"], season_row["id"])).fetchall()
-
-        # Get TCA and total from answers table
-        totals = conn.execute("""
-            SELECT
-                COUNT(*) as total_q,
-                SUM(CASE WHEN a.correct THEN 1 ELSE 0 END) as tca
-            FROM answers a
-            JOIN questions q ON a.question_id = q.id
-            WHERE a.player_id = ? AND q.season_id = ?
-        """, (player["id"], season_row["id"])).fetchone() if season_row else None
-
-        # If no answer data, try to get totals from matches table
-        if not totals or totals["total_q"] == 0:
-            match_totals = conn.execute("""
-                SELECT
-                    COUNT(*) * 6 as total_q,
-                    SUM(CASE WHEN player1_id = ? THEN player1_tca ELSE player2_tca END) as tca
-                FROM matches
-                WHERE season_id = ? AND (player1_id = ? OR player2_id = ?)
-            """, (player["id"], season_row["id"], player["id"], player["id"])).fetchone() if season_row else None
-            if match_totals and match_totals["tca"]:
-                totals = match_totals
-
-        # Get head-to-head match history from matches table
-        h2h_matches = []
-        if season_row:
-            h2h_matches = conn.execute("""
-                SELECT
-                    m.match_day,
-                    CASE WHEN m.player1_id = ? THEN m.player1_score ELSE m.player2_score END as my_score,
-                    CASE WHEN m.player1_id = ? THEN m.player2_score ELSE m.player1_score END as opp_score,
-                    CASE WHEN m.player1_id = ? THEN m.player1_tca ELSE m.player2_tca END as my_tca,
-                    CASE WHEN m.player1_id = ? THEN p2.ll_username ELSE p1.ll_username END as opponent,
-                    CASE
-                        WHEN (m.player1_id = ? AND m.player1_score > m.player2_score) OR
-                             (m.player2_id = ? AND m.player2_score > m.player1_score) THEN 'W'
-                        WHEN m.player1_score = m.player2_score THEN 'T'
-                        ELSE 'L'
-                    END as result
-                FROM matches m
-                JOIN players p1 ON m.player1_id = p1.id
-                JOIN players p2 ON m.player2_id = p2.id
-                WHERE m.season_id = ? AND (m.player1_id = ? OR m.player2_id = ?)
-                ORDER BY m.match_day
-            """, (player["id"], player["id"], player["id"], player["id"],
-                  player["id"], player["id"], season_row["id"], player["id"], player["id"])).fetchall()
-
-        # Calculate metrics for this player
-        metrics_data = {}
-        for metric in MetricRegistry.all():
-            if Scope.PLAYER in metric.scopes:
-                try:
-                    result = metric.calculate(
-                        conn, Scope.PLAYER,
-                        player_id=player["id"],
-                        season_id=season_row["id"] if season_row else None
-                    )
-                    metrics_data[metric.id] = {
-                        "name": metric.name,
-                        "description": metric.description,
-                        "result": result.to_dict() if result else None
-                    }
-                except Exception as e:
-                    metrics_data[metric.id] = {
-                        "name": metric.name,
-                        "description": metric.description,
-                        "error": str(e)
-                    }
-
-        return templates.TemplateResponse("player.html", {
-            "request": request,
-            "player": dict(player),
-            "season": dict(season_row) if season_row else None,
-            "category_stats": [dict(c) for c in category_stats],
-            "match_results": [dict(m) for m in match_results],
-            "h2h_matches": [dict(m) for m in h2h_matches],
-            "totals": dict(totals) if totals else {"total_q": 0, "tca": 0},
-            "metrics": metrics_data,
-            "all_metrics": MetricRegistry.all_info(),
-        })
-
-
-@app.get("/player/{username}/surprise", response_class=HTMLResponse)
-async def player_surprise(request: Request, username: str, season: Optional[int] = Query(None)):
-    """Player surprise breakdown page."""
-    if not templates:
-        return RedirectResponse(f"/api/metrics/surprise/questions/{username}?season={season or 107}")
-
-    # Get season number (default to most recent)
-    with get_connection() as conn:
-        if season:
-            season_num = season
-        else:
-            row = conn.execute(
-                "SELECT season_number FROM seasons ORDER BY season_number DESC LIMIT 1"
-            ).fetchone()
-            season_num = row["season_number"] if row else 107
-
-    return templates.TemplateResponse("surprise_questions.html", {
-        "request": request,
-        "username": username,
-        "season": season_num,
-    })
-
-
-@app.get("/surprise/distribution", response_class=HTMLResponse)
-async def surprise_distribution_page(request: Request, season: Optional[int] = Query(None)):
-    """Surprise distribution chart page."""
-    if not templates:
-        return RedirectResponse(f"/api/metrics/surprise/distribution?season={season or 107}")
-
-    with get_connection() as conn:
-        if season:
-            season_num = season
-        else:
-            row = conn.execute(
-                "SELECT season_number FROM seasons ORDER BY season_number DESC LIMIT 1"
-            ).fetchone()
-            season_num = row["season_number"] if row else 107
-
-    return templates.TemplateResponse("surprise_distribution.html", {
-        "request": request,
-        "season": season_num,
-    })
-
-
-@app.get("/luck/{username}", response_class=HTMLResponse)
-async def luck_page(request: Request, username: str, season: Optional[int] = Query(None)):
-    """Player luck analysis page."""
-    if not templates:
-        return RedirectResponse(f"/api/luck/{username}?season={season or 107}")
-
-    with get_connection() as conn:
-        # Get season number
-        if season:
-            season_num = season
-        else:
-            row = conn.execute(
-                "SELECT season_number FROM seasons ORDER BY season_number DESC LIMIT 1"
-            ).fetchone()
-            season_num = row["season_number"] if row else 107
-
-        # Get player's rundle
-        player = conn.execute(
-            "SELECT p.id, r.name as rundle FROM players p "
-            "JOIN player_rundles pr ON p.id = pr.player_id "
-            "JOIN rundles r ON pr.rundle_id = r.id "
-            "JOIN seasons s ON r.season_id = s.id "
-            "WHERE p.ll_username = ? AND s.season_number = ?",
-            (username, season_num)
-        ).fetchone()
-
-        rundle = player["rundle"] if player else "C_Skyline"
-
-    return templates.TemplateResponse("luck.html", {
-        "request": request,
-        "username": username,
-        "season": season_num,
-        "rundle": rundle,
-    })
 
 
 def run_server():

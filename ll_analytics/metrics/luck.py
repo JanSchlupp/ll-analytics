@@ -87,6 +87,108 @@ class LuckMetric(BaseMetric):
     cacheable = True
     cache_ttl = 1800
 
+    # ── Public helpers (used by routes) ────────────────────────────
+
+    def match_detail(
+        self,
+        conn: sqlite3.Connection,
+        username: str,
+        match_day: int,
+        season_id: int,
+    ) -> dict | None:
+        """
+        Per-question breakdown for a specific match.
+
+        Returns dict with match_day, players, scores, and question details
+        including lifetime category stats for both players.
+        """
+        player = conn.execute(
+            "SELECT id FROM players WHERE ll_username = ?", (username,)
+        ).fetchone()
+        if not player:
+            return None
+
+        match = conn.execute("""
+            SELECT m.*, p1.ll_username as p1_name, p2.ll_username as p2_name
+            FROM matches m
+            JOIN players p1 ON m.player1_id = p1.id
+            JOIN players p2 ON m.player2_id = p2.id
+            WHERE m.season_id = ? AND m.match_day = ?
+            AND (m.player1_id = ? OR m.player2_id = ?)
+        """, (season_id, match_day, player["id"], player["id"])).fetchone()
+
+        if not match:
+            return None
+
+        # Determine perspective
+        if match["player1_id"] == player["id"]:
+            your_id, your_name = match["player1_id"], match["p1_name"]
+            opp_id, opp_name = match["player2_id"], match["p2_name"]
+            your_score, opp_score = match["player1_score"], match["player2_score"]
+            your_tca, opp_tca = match["player1_tca"], match["player2_tca"]
+            your_field, opp_field = "player1", "player2"
+        else:
+            your_id, your_name = match["player2_id"], match["p2_name"]
+            opp_id, opp_name = match["player1_id"], match["p1_name"]
+            your_score, opp_score = match["player2_score"], match["player1_score"]
+            your_tca, opp_tca = match["player2_tca"], match["player1_tca"]
+            your_field, opp_field = "player2", "player1"
+
+        questions = conn.execute("""
+            SELECT mq.*, c.name as category_name
+            FROM match_questions mq
+            LEFT JOIN categories c ON mq.category_id = c.id
+            WHERE mq.match_id = ?
+            ORDER BY mq.question_num
+        """, (match["id"],)).fetchall()
+
+        your_lifetime = {
+            r["category_id"]: r
+            for r in conn.execute(
+                "SELECT * FROM player_lifetime_stats WHERE player_id = ?", (your_id,)
+            ).fetchall()
+        }
+        opp_lifetime = {
+            r["category_id"]: r
+            for r in conn.execute(
+                "SELECT * FROM player_lifetime_stats WHERE player_id = ?", (opp_id,)
+            ).fetchall()
+        }
+
+        question_details = []
+        for q in questions:
+            cat_id = q["category_id"]
+            your_cat_pct = your_lifetime.get(cat_id, {}).get("correct_pct") if cat_id else None
+            opp_cat_pct = opp_lifetime.get(cat_id, {}).get("correct_pct") if cat_id else None
+
+            question_details.append({
+                "question_num": q["question_num"],
+                "category": q["category_name"],
+                "ca_pct": q["question_ca_pct"],
+                "your_correct": q[f"{your_field}_correct"],
+                "opp_correct": q[f"{opp_field}_correct"],
+                "your_defense": q[f"{your_field}_defense"],
+                "opp_defense": q[f"{opp_field}_defense"],
+                "your_cat_pct": round(your_cat_pct * 100, 1) if your_cat_pct else None,
+                "opp_cat_pct": round(opp_cat_pct * 100, 1) if opp_cat_pct else None,
+            })
+
+        result = "W" if your_score > opp_score else ("L" if your_score < opp_score else "T")
+
+        return {
+            "match_day": match_day,
+            "your_name": your_name,
+            "opponent": opp_name,
+            "your_score": your_score,
+            "opp_score": opp_score,
+            "your_tca": your_tca,
+            "opp_tca": opp_tca,
+            "result": result,
+            "questions": question_details,
+        }
+
+    # ── Core calculate dispatch ────────────────────────────────────
+
     def calculate(
         self,
         conn: sqlite3.Connection,

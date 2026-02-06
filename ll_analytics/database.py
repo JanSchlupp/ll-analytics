@@ -6,6 +6,9 @@ from contextlib import contextmanager
 from typing import Generator
 
 from .config import Config, LL_CATEGORIES
+from .logging import get_logger
+
+logger = get_logger(__name__)
 
 
 SCHEMA = """
@@ -171,7 +174,7 @@ def init_db() -> None:
             )
 
         conn.commit()
-        print(f"Database initialized at {get_db_path()}")
+        logger.info("Database initialized at %s", get_db_path())
 
 
 def get_category_id(conn: sqlite3.Connection, category_name: str) -> int | None:

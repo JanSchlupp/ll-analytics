@@ -153,6 +153,213 @@ class SurpriseMetric(BaseMetric):
     cacheable = True
     cache_ttl = 1800  # 30 minutes
 
+    # ── Public helpers (used by routes) ────────────────────────────
+
+    def detail_for_player(
+        self,
+        conn: sqlite3.Connection,
+        username: str,
+        season_id: int,
+        sort_by: str = "surprise",
+        order: str = "desc",
+    ) -> dict:
+        """
+        Per-question surprise breakdown for a player.
+
+        Returns dict with player, season, total_surprise, avg_surprise,
+        question_count, and a sortable questions list.
+        """
+        player = conn.execute(
+            "SELECT id FROM players WHERE ll_username = ?", (username,)
+        ).fetchone()
+        if not player:
+            return None
+
+        answers = conn.execute("""
+            SELECT
+                a.correct,
+                q.match_day,
+                q.question_number,
+                q.question_text,
+                q.correct_answer,
+                q.rundle_correct_pct,
+                c.name as category,
+                COALESCE(pcs.correct_pct, pls.correct_pct) as player_category_pct
+            FROM answers a
+            JOIN questions q ON a.question_id = q.id
+            JOIN categories c ON q.category_id = c.id
+            LEFT JOIN player_category_stats pcs ON (
+                pcs.player_id = a.player_id
+                AND pcs.category_id = q.category_id
+                AND pcs.season_id = q.season_id
+            )
+            LEFT JOIN player_lifetime_stats pls ON (
+                pls.player_id = a.player_id
+                AND pls.category_id = q.category_id
+            )
+            WHERE a.player_id = ? AND q.season_id = ?
+            ORDER BY q.match_day, q.question_number
+        """, (player["id"], season_id)).fetchall()
+
+        questions = []
+        total_surprise = 0
+
+        for row in answers:
+            player_cat_pct = row["player_category_pct"] or 0.5
+            question_difficulty = row["rundle_correct_pct"] or 0.5
+
+            expected = calculate_expected_probability(player_cat_pct, question_difficulty)
+            surprise = calculate_surprise(row["correct"], expected)
+            total_surprise += surprise
+
+            questions.append({
+                "match_day": row["match_day"],
+                "question_number": row["question_number"],
+                "category": row["category"],
+                "question_text": row["question_text"] or "",
+                "correct_answer": row["correct_answer"] or "",
+                "got_correct": bool(row["correct"]),
+                "expected_prob": round(expected, 3),
+                "surprise": round(surprise, 3),
+                "difficulty": round(question_difficulty, 3),
+                "player_cat_pct": round(player_cat_pct, 3),
+            })
+
+        # Sort
+        reverse = order.lower() == "desc"
+        sort_keys = {
+            "surprise": lambda x: x["surprise"],
+            "match_day": lambda x: (x["match_day"], x["question_number"]),
+            "category": lambda x: x["category"],
+            "expected_prob": lambda x: x["expected_prob"],
+        }
+        if sort_by in sort_keys:
+            questions.sort(key=sort_keys[sort_by], reverse=reverse)
+
+        return {
+            "player": username,
+            "total_surprise": round(total_surprise, 3),
+            "avg_surprise": round(total_surprise / len(questions), 4) if questions else 0,
+            "question_count": len(questions),
+            "questions": questions,
+        }
+
+    def distribution_by_day(
+        self,
+        conn: sqlite3.Connection,
+        season_id: int,
+        rundle: str | None = None,
+        leverage_start_day: int = 12,
+    ) -> dict:
+        """
+        Average surprise by match day, split by player leverage.
+
+        Returns dict with distribution list and leverage metadata.
+        """
+        from ..config import Config
+
+        # Get players with their ranks
+        rundle_filter = ""
+        params: list = [season_id]
+
+        if rundle:
+            rundle_row = conn.execute(
+                "SELECT id FROM rundles WHERE name = ? AND season_id = ?",
+                (rundle, season_id),
+            ).fetchone()
+            if rundle_row:
+                rundle_filter = "AND pr.rundle_id = ?"
+                params.append(rundle_row["id"])
+
+        players = conn.execute(f"""
+            SELECT p.id, p.ll_username, pr.final_rank,
+                   (SELECT COUNT(*) FROM player_rundles pr2 WHERE pr2.rundle_id = pr.rundle_id) as rundle_size
+            FROM players p
+            JOIN player_rundles pr ON p.id = pr.player_id
+            JOIN rundles r ON pr.rundle_id = r.id
+            WHERE r.season_id = ? {rundle_filter}
+        """, params).fetchall()
+
+        # Classify leverage
+        player_leverage = {}
+        for p in players:
+            rank = p["final_rank"] or 999
+            size = p["rundle_size"] or 38
+            pct = rank / size
+            player_leverage[p["id"]] = "high" if (pct <= 0.2 or pct >= 0.8) else "low"
+
+        # Calculate surprise by day
+        daily_surprises: dict[int, dict[str, list]] = {}
+
+        for p in players:
+            player_id = p["id"]
+            plev = player_leverage.get(player_id, "low")
+
+            answers = conn.execute("""
+                SELECT
+                    a.correct,
+                    q.match_day,
+                    q.rundle_correct_pct,
+                    COALESCE(pcs.correct_pct, pls.correct_pct) as player_category_pct
+                FROM answers a
+                JOIN questions q ON a.question_id = q.id
+                LEFT JOIN player_category_stats pcs ON (
+                    pcs.player_id = a.player_id
+                    AND pcs.category_id = q.category_id
+                    AND pcs.season_id = q.season_id
+                )
+                LEFT JOIN player_lifetime_stats pls ON (
+                    pls.player_id = a.player_id
+                    AND pls.category_id = q.category_id
+                )
+                WHERE a.player_id = ? AND q.season_id = ?
+                ORDER BY q.match_day
+            """, (player_id, season_id)).fetchall()
+
+            for row in answers:
+                day = row["match_day"]
+                player_cat_pct = row["player_category_pct"] or 0.5
+                question_difficulty = row["rundle_correct_pct"] or 0.5
+
+                expected = calculate_expected_probability(player_cat_pct, question_difficulty)
+                surprise = calculate_surprise(row["correct"], expected)
+
+                if day not in daily_surprises:
+                    daily_surprises[day] = {"all": [], "high": [], "low": []}
+
+                daily_surprises[day]["all"].append(surprise)
+                if day >= leverage_start_day:
+                    daily_surprises[day][plev].append(surprise)
+
+        # Build result
+        distribution = []
+        for day in sorted(daily_surprises.keys()):
+            data = daily_surprises[day]
+            entry = {
+                "match_day": day,
+                "avg_surprise_all": round(sum(data["all"]) / len(data["all"]), 4) if data["all"] else 0,
+                "count_all": len(data["all"]),
+            }
+            if data["high"]:
+                entry["avg_surprise_high"] = round(sum(data["high"]) / len(data["high"]), 4)
+                entry["count_high"] = len(data["high"])
+            if data["low"]:
+                entry["avg_surprise_low"] = round(sum(data["low"]) / len(data["low"]), 4)
+                entry["count_low"] = len(data["low"])
+            distribution.append(entry)
+
+        return {
+            "distribution": distribution,
+            "leverage_start_day": leverage_start_day,
+            "leverage_explanation": {
+                "high": "Players in top/bottom 20% of standings (promotion/relegation zone)",
+                "low": "Players in middle 60% of standings (safely mid-table)",
+                "note": f"Leverage split only applies after day {leverage_start_day} when standings stabilize",
+            },
+        }
+
+    # ── Core calculate dispatch ────────────────────────────────────
+
     def calculate(
         self,
         conn: sqlite3.Connection,

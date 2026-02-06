@@ -5,6 +5,9 @@ import requests
 from typing import Optional
 
 from ..config import Config
+from ..logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class LLSession:
@@ -57,7 +60,7 @@ class LLSession:
         response = self.session.get(login_url, timeout=Config.REQUEST_TIMEOUT)
 
         if response.status_code != 200:
-            print(f"Failed to load login page: {response.status_code}")
+            logger.error("Failed to load login page: %s", response.status_code)
             return False
 
         # Submit login form
@@ -82,9 +85,9 @@ class LLSession:
         self.logged_in = self._verify_login()
 
         if self.logged_in:
-            print(f"Successfully logged in as {username}")
+            logger.info("Successfully logged in as %s", username)
         else:
-            print("Login failed. Check credentials.")
+            logger.error("Login failed. Check credentials.")
 
         return self.logged_in
 
@@ -111,7 +114,7 @@ class LLSession:
             Response HTML text, or None if request failed
         """
         if not self.logged_in:
-            print("Warning: Not logged in. Call login() first.")
+            logger.warning("Not logged in. Call login() first.")
 
         url = f"{self.base_url}{path}" if path.startswith("/") else f"{self.base_url}/{path}"
 
@@ -121,7 +124,7 @@ class LLSession:
             response.raise_for_status()
             return response.text
         except requests.RequestException as e:
-            print(f"Request failed for {path}: {e}")
+            logger.error("Request failed for %s: %s", path, e)
             return None
 
     def logout(self) -> None:
@@ -138,4 +141,4 @@ class LLSession:
 
         self.session.cookies.clear()
         self.logged_in = False
-        print("Logged out")
+        logger.info("Logged out")

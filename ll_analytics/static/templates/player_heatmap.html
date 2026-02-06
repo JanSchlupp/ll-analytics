@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}{{ username }} - Performance Heatmap - LL Analytics{% endblock %}
+
+{% block content %}
+<div x-data="heatmapData()">
+    <!-- Header -->
+    <div class="mb-6 flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Performance Heatmap</h1>
+            <p class="text-gray-600 mt-1">
+                <a href="/player/{{ username }}" class="text-indigo-600 hover:underline">{{ username }}</a>
+                - Season {{ season }}
+            </p>
+        </div>
+        <a href="/player/{{ username }}?season={{ season }}" class="text-indigo-600 hover:underline text-sm">&larr; Back to Profile</a>
+    </div>
+
+    <!-- Legend -->
+    <div class="flex gap-4 mb-4 text-sm">
+        <div class="flex items-center gap-1">
+            <div class="w-5 h-5 rounded heatmap-correct"></div>
+            <span>Correct</span>
+        </div>
+        <div class="flex items-center gap-1">
+            <div class="w-5 h-5 rounded heatmap-incorrect"></div>
+            <span>Incorrect</span>
+        </div>
+        <div class="flex items-center gap-1">
+            <div class="w-5 h-5 rounded heatmap-no-data"></div>
+            <span>No Data</span>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div x-show="loading" class="flex justify-center py-12">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Heatmap Table -->
+    <div x-show="!loading" x-cloak class="bg-white rounded-lg shadow overflow-auto">
+        <table class="min-w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day</th>
+                    <template x-for="q in 6">
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" x-text="'Q' + q"></th>
+                    </template>
+                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">TCA</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                <template x-for="day in days" :key="day">
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 text-sm font-medium text-gray-900" x-text="'Day ' + day"></td>
+                        <template x-for="q in 6" :key="q">
+                            <td class="px-4 py-2 text-center">
+                                <div
+                                    class="w-8 h-8 rounded mx-auto cursor-pointer heatmap-cell tooltip"
+                                    :class="getCellClass(day, q)"
+                                    :data-tooltip="getCellTooltip(day, q)"
+                                    @click="showDetail(day, q)"
+                                ></div>
+                            </td>
+                        </template>
+                        <td class="px-4 py-2 text-center text-sm font-medium" x-text="getDayTCA(day)"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Question Detail Modal -->
+    <div x-show="selectedQuestion" x-cloak
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+         @click.self="selectedQuestion = null">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg mx-4" x-show="selectedQuestion">
+            <div class="flex justify-between items-start mb-4">
+                <h3 class="text-lg font-medium text-gray-900">Question Detail</h3>
+                <button @click="selectedQuestion = null" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <template x-if="selectedQuestion">
+                <div class="space-y-2">
+                    <div class="text-sm">
+                        <span class="font-medium">Category:</span>
+                        <span x-text="selectedQuestion.category"></span>
+                    </div>
+                    <div class="text-sm">
+                        <span class="font-medium">Result:</span>
+                        <span :class="selectedQuestion.correct ? 'text-green-600' : 'text-red-600'"
+                              x-text="selectedQuestion.correct ? 'Correct' : 'Incorrect'"></span>
+                    </div>
+                    <div x-show="selectedQuestion.question_text" class="text-sm">
+                        <span class="font-medium">Question:</span>
+                        <p class="mt-1 text-gray-600" x-text="selectedQuestion.question_text"></p>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function heatmapData() {
+    return {
+        data: {},
+        days: [],
+        loading: true,
+        selectedQuestion: null,
+
+        async init() {
+            try {
+                const resp = await fetch('/api/players/{{ username }}/heatmap?season={{ season }}');
+                const json = await resp.json();
+                this.data = json.data || {};
+                // Build sorted list of days (1-25)
+                const daySet = new Set();
+                for (const d of Object.keys(this.data)) daySet.add(parseInt(d));
+                // Always show days 1-25 for a full grid
+                for (let i = 1; i <= 25; i++) daySet.add(i);
+                this.days = [...daySet].sort((a, b) => a - b);
+            } catch (e) {
+                console.error('Failed to load heatmap:', e);
+            }
+            this.loading = false;
+        },
+
+        getCell(day, q) {
+            return this.data[String(day)]?.[String(q)] || null;
+        },
+
+        getCellClass(day, q) {
+            const cell = this.getCell(day, q);
+            if (!cell) return 'heatmap-no-data';
+            return cell.correct ? 'heatmap-correct' : 'heatmap-incorrect';
+        },
+
+        getCellTooltip(day, q) {
+            const cell = this.getCell(day, q);
+            if (!cell) return 'No data';
+            return `${cell.category} - ${cell.correct ? 'Correct' : 'Incorrect'}`;
+        },
+
+        getDayTCA(day) {
+            const dayData = this.data[String(day)];
+            if (!dayData) return '-';
+            return Object.values(dayData).filter(q => q.correct).length + '/6';
+        },
+
+        showDetail(day, q) {
+            const cell = this.getCell(day, q);
+            if (cell) this.selectedQuestion = cell;
+        },
+    };
+}
+</script>
+{% endblock %}

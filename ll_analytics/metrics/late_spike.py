@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from .base import BaseMetric, MetricResult, Scope, VisualizationType
 from .registry import metric
 from .surprise import calculate_expected_probability, calculate_surprise
+from ..config import Config
 
 
 @dataclass
@@ -44,9 +45,8 @@ class LateSeasonSpikeMetric(BaseMetric):
     cacheable = True
     cache_ttl = 3600
 
-    # Configurable day ranges
-    EARLY_DAYS = range(1, 11)  # Days 1-10
-    LATE_DAYS = range(20, 26)  # Days 20-25
+    EARLY_DAYS = Config.EARLY_DAYS
+    LATE_DAYS = Config.LATE_DAYS
 
     def calculate(
         self,

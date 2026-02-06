@@ -27,9 +27,22 @@ class Config:
     API_PORT: int = int(os.getenv("API_PORT", "8000"))
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
+    # Logging
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    LOG_FILE: str | None = os.getenv("LOG_FILE")
+
     # Scraper settings
     REQUEST_DELAY: float = 1.5  # Seconds between requests
     REQUEST_TIMEOUT: int = 30  # Seconds
+
+    # Game defaults
+    DEFAULT_SEASON: int = int(os.getenv("DEFAULT_SEASON", "107"))
+    DEFAULT_RUNDLE: str = os.getenv("DEFAULT_RUNDLE", "C_Skyline")
+
+    # Metric tunables
+    LEVERAGE_START_DAY: int = 12  # Surprise distribution: leverage split after this day
+    EARLY_DAYS: range = range(1, 11)   # Late-spike metric: days 1-10
+    LATE_DAYS: range = range(20, 26)   # Late-spike metric: days 20-25
 
     @classmethod
     def ensure_data_dir(cls) -> None:

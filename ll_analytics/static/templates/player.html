@@ -78,6 +78,16 @@
 
     <!-- Overview Tab -->
     <div x-show="activeTab === 'overview'" class="space-y-6">
+        <!-- Quick Links -->
+        {% if season %}
+        <div class="flex gap-2">
+            <a href="/player/{{ player.ll_username }}/heatmap?season={{ season.season_number }}"
+               class="inline-flex items-center px-3 py-1.5 bg-indigo-100 text-indigo-800 text-sm rounded-md hover:bg-indigo-200">
+                View Performance Heatmap &rarr;
+            </a>
+        </div>
+        {% endif %}
+
         <!-- Match Day Chart -->
         <div class="bg-white rounded-lg shadow p-4">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Performance by Match Day</h3>

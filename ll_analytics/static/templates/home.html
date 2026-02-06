@@ -60,6 +60,53 @@
     </div>
     {% else %}
 
+    <!-- Dashboard Widgets -->
+    <div x-data="dashboardWidgets()" x-init="loadDashboard()">
+        <!-- Quick Stats Strip -->
+        <div x-show="stats.totalMatches" x-cloak class="grid grid-cols-3 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <div class="text-2xl font-bold text-indigo-600" x-text="stats.totalMatches"></div>
+                <div class="text-sm text-gray-500">Total Matches</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <div class="text-2xl font-bold text-gray-900" x-text="stats.totalQuestions"></div>
+                <div class="text-sm text-gray-500">Total Questions</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <div class="text-2xl font-bold text-green-600" x-text="stats.seasonProgress + '%'"></div>
+                <div class="text-sm text-gray-500">Season Progress</div>
+            </div>
+        </div>
+
+        <!-- Movers & Category Difficulty Row -->
+        <div x-show="movers.length > 0 || Object.keys(categoryDifficulty).length > 0" x-cloak class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <!-- Movers & Shakers -->
+            <div class="bg-white rounded-lg shadow p-4">
+                <h3 class="text-lg font-medium text-gray-900 mb-3">Movers & Shakers</h3>
+                <p class="text-xs text-gray-500 mb-3">Recent surprise trend (last 5 days vs prior 5)</p>
+                <div class="space-y-3">
+                    <template x-for="mover in movers" :key="mover.username">
+                        <div class="flex items-center justify-between">
+                            <a :href="'/player/' + mover.username" class="text-indigo-600 hover:underline font-medium text-sm" x-text="mover.username"></a>
+                            <span class="text-sm font-bold"
+                                  :class="mover.delta > 0 ? 'text-green-600' : 'text-red-600'"
+                                  x-text="(mover.delta > 0 ? '+' : '') + mover.delta.toFixed(3)"></span>
+                        </div>
+                    </template>
+                    <div x-show="movers.length === 0" class="text-sm text-gray-400">No data yet</div>
+                </div>
+            </div>
+
+            <!-- Category Difficulty Chart -->
+            <div class="md:col-span-2 bg-white rounded-lg shadow p-4">
+                <h3 class="text-lg font-medium text-gray-900 mb-3">Category Difficulty</h3>
+                <div class="chart-container" style="height: 250px;">
+                    <canvas id="categoryDifficultyChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Rundle Selector and Metric Selector -->
     <div class="flex flex-wrap gap-4 mb-6">
         <!-- Rundle Dropdown -->
@@ -190,4 +237,70 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+function dashboardWidgets() {
+    return {
+        movers: [],
+        categoryDifficulty: {},
+        stats: {},
+        difficultyChart: null,
+
+        async loadDashboard() {
+            try {
+                const params = new URLSearchParams();
+                {% if season %}params.set('season_id', '{{ season.id }}');{% endif %}
+                {% if current_rundle %}params.set('rundle_id', '{{ current_rundle.id }}');{% endif %}
+                const resp = await fetch('/api/dashboard?' + params.toString());
+                const data = await resp.json();
+                this.movers = data.movers || [];
+                this.categoryDifficulty = data.category_difficulty || {};
+                this.stats = data.stats || {};
+
+                // Render category difficulty chart
+                this.$nextTick(() => this.renderCategoryChart());
+            } catch (e) {
+                console.error('Failed to load dashboard:', e);
+            }
+        },
+
+        renderCategoryChart() {
+            const ctx = document.getElementById('categoryDifficultyChart');
+            if (!ctx || !Object.keys(this.categoryDifficulty).length) return;
+
+            // Sort by CA% ascending for horizontal bar
+            const sorted = Object.entries(this.categoryDifficulty)
+                .sort((a, b) => a[1] - b[1]);
+            const labels = sorted.map(e => e[0]);
+            const values = sorted.map(e => e[1] * 100);
+            const colors = values.map(v => {
+                if (v < 40) return 'rgba(239, 68, 68, 0.7)';
+                if (v < 60) return 'rgba(234, 179, 8, 0.7)';
+                return 'rgba(34, 197, 94, 0.7)';
+            });
+
+            if (this.difficultyChart) this.difficultyChart.destroy();
+            this.difficultyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'CA%',
+                        data: values,
+                        backgroundColor: colors,
+                    }],
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { min: 0, max: 100, title: { display: true, text: 'CA%' } },
+                    },
+                },
+            });
+        },
+    };
+}
+</script>
 {% endblock %}

@@ -41,6 +41,9 @@ from .registry import MetricRegistry, metric
 from . import surprise
 from . import late_spike
 from . import luck
+from . import defense
+from . import breadth
+from . import matchup
 
 __all__ = [
     "BaseMetric",

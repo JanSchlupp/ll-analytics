@@ -6,6 +6,9 @@ from bs4 import BeautifulSoup
 
 from .auth import LLSession
 from ..config import LL_CATEGORIES
+from ..logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def normalize_category(raw_category: str) -> Optional[str]:
@@ -233,7 +236,7 @@ def scrape_season_questions(
         if result["rundle_stats"]:
             all_rundle_stats[day] = result["rundle_stats"]
 
-        print(f"  Day {day}: {len(questions)} questions, {len(result['rundle_stats'])} rundles")
+        logger.info("  Day %d: %d questions, %d rundles", day, len(questions), len(result['rundle_stats']))
 
     return all_questions, all_rundle_stats
 

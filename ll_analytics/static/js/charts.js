@@ -247,12 +247,57 @@ function renderMetricChart(containerId, result) {
     return null;
 }
 
+/**
+ * Create a radar chart for category comparisons
+ */
+function createRadarChart(ctx, data, options = {}) {
+    const config = {
+        type: 'radar',
+        data: {
+            labels: data.labels,
+            datasets: data.datasets.map((ds, i) => ({
+                ...ds,
+                borderColor: ds.borderColor || COLOR_PALETTE[i % COLOR_PALETTE.length],
+                backgroundColor: ds.backgroundColor || (COLOR_PALETTE[i % COLOR_PALETTE.length].replace('rgb', 'rgba').replace(')', ', 0.15)')),
+                pointRadius: 3,
+                pointHoverRadius: 5,
+            })),
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: data.datasets.length > 1,
+                },
+                title: {
+                    display: !!options.title,
+                    text: options.title,
+                },
+            },
+            scales: {
+                r: {
+                    min: 0,
+                    max: options.max || 100,
+                    ticks: {
+                        stepSize: options.stepSize || 20,
+                    },
+                },
+            },
+            ...options,
+        },
+    };
+
+    return new Chart(ctx, config);
+}
+
 // Export functions for use in other scripts
 window.LLCharts = {
     createLineChart,
     createBarChart,
     createScatterChart,
     createHistogram,
+    createRadarChart,
     renderMetricChart,
     CHART_COLORS,
     COLOR_PALETTE,
