@@ -21,7 +21,7 @@ STATIC_DIR = BASE_DIR / "static"
 app = FastAPI(
     title="LL Analytics",
     description="Learned League Analytics Platform - Custom metrics and analysis",
-    version="0.1.0",
+    version="1.4.0",
 )
 
 # Mount static files
