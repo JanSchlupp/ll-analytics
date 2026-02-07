@@ -2,13 +2,13 @@
  * Chart.js helpers for LL Analytics
  */
 
-// Default chart colors
+// Default chart colors (emerald primary for dark theme)
 const CHART_COLORS = {
-    primary: 'rgb(79, 70, 229)',      // Indigo
-    secondary: 'rgb(16, 185, 129)',   // Green
-    tertiary: 'rgb(245, 158, 11)',    // Yellow
-    danger: 'rgb(239, 68, 68)',       // Red
-    gray: 'rgb(156, 163, 175)',       // Gray
+    primary: 'rgb(52, 211, 153)',      // Emerald-400
+    secondary: 'rgb(96, 165, 250)',    // Blue-400
+    tertiary: 'rgb(250, 204, 21)',     // Yellow-400
+    danger: 'rgb(248, 113, 113)',      // Red-400
+    gray: 'rgb(148, 163, 184)',        // Slate-400
 };
 
 // Color palette for multiple series
@@ -17,11 +17,24 @@ const COLOR_PALETTE = [
     CHART_COLORS.secondary,
     CHART_COLORS.tertiary,
     CHART_COLORS.danger,
-    'rgb(139, 92, 246)',   // Purple
-    'rgb(236, 72, 153)',   // Pink
-    'rgb(6, 182, 212)',    // Cyan
-    'rgb(251, 146, 60)',   // Orange
+    'rgb(167, 139, 250)',  // Purple-400
+    'rgb(244, 114, 182)',  // Pink-400
+    'rgb(34, 211, 238)',   // Cyan-400
+    'rgb(251, 146, 60)',   // Orange-400
 ];
+
+// Set Chart.js defaults for dark backgrounds
+Chart.defaults.color = '#94a3b8';           // slate-400 for text
+Chart.defaults.borderColor = '#1e293b';     // slate-800 for grid lines
+Chart.defaults.backgroundColor = 'transparent';
+Chart.defaults.plugins.legend.labels.color = '#cbd5e1'; // slate-300
+Chart.defaults.plugins.title.color = '#e2e8f0';         // slate-200
+Chart.defaults.scale.grid = {
+    color: 'rgba(51, 65, 85, 0.5)',  // slate-700 at 50%
+};
+Chart.defaults.scale.ticks = {
+    color: '#94a3b8', // slate-400
+};
 
 /**
  * Create a line chart for time series data
@@ -281,6 +294,17 @@ function createRadarChart(ctx, data, options = {}) {
                     max: options.max || 100,
                     ticks: {
                         stepSize: options.stepSize || 20,
+                        color: '#94a3b8',
+                        backdropColor: 'transparent',
+                    },
+                    grid: {
+                        color: 'rgba(51, 65, 85, 0.5)',
+                    },
+                    angleLines: {
+                        color: 'rgba(51, 65, 85, 0.5)',
+                    },
+                    pointLabels: {
+                        color: '#cbd5e1',
                     },
                 },
             },

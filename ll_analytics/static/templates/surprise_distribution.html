@@ -7,83 +7,83 @@
     <!-- Header -->
     <div class="mb-6">
         <nav class="text-sm mb-2">
-            <a href="/" class="text-indigo-600 hover:underline">Home</a>
-            <span class="text-gray-400 mx-2">/</span>
-            <span class="text-gray-600">Surprise Distribution</span>
+            <a href="/" class="text-emerald-400 hover:text-emerald-300">Home</a>
+            <span class="text-slate-600 mx-2">/</span>
+            <span class="text-slate-400">Surprise Distribution</span>
         </nav>
-        <h1 class="text-3xl font-bold text-gray-900">Surprise Distribution Over Time</h1>
-        <p class="text-gray-600 mt-1">Season {{ season }} - Average surprise by match day</p>
+        <h1 class="text-3xl font-bold text-gray-100">Surprise Distribution Over Time</h1>
+        <p class="text-slate-400 mt-1">Season {{ season }} - Average surprise by match day</p>
     </div>
 
     <!-- Legend -->
-    <div class="bg-white rounded-lg shadow p-4 mb-6">
-        <h3 class="font-medium text-gray-900 mb-3">Understanding Leverage</h3>
+    <div class="bg-slate-900 border border-slate-800 rounded-lg p-4 mb-6">
+        <h3 class="font-medium text-gray-100 mb-3">Understanding Leverage</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div class="flex items-start gap-3">
                 <span class="inline-block w-4 h-4 bg-red-500 rounded mt-0.5"></span>
                 <div>
-                    <span class="font-medium">High Leverage</span>
-                    <p class="text-gray-600">Players in the top or bottom 20% of standings - fighting for promotion or avoiding relegation</p>
+                    <span class="font-medium text-gray-100">High Leverage</span>
+                    <p class="text-slate-400">Players in the top or bottom 20% of standings - fighting for promotion or avoiding relegation</p>
                 </div>
             </div>
             <div class="flex items-start gap-3">
                 <span class="inline-block w-4 h-4 bg-blue-500 rounded mt-0.5"></span>
                 <div>
-                    <span class="font-medium">Low Leverage</span>
-                    <p class="text-gray-600">Players safely in the middle 60% - not in immediate danger of promotion/relegation</p>
+                    <span class="font-medium text-gray-100">Low Leverage</span>
+                    <p class="text-slate-400">Players safely in the middle 60% - not in immediate danger of promotion/relegation</p>
                 </div>
             </div>
         </div>
-        <p class="text-xs text-gray-500 mt-3 border-t pt-3">
-            <strong>Note:</strong> Leverage breakdown shows for all players in scraped rundles.
+        <p class="text-xs text-slate-500 mt-3 border-t border-slate-700 pt-3">
+            <strong class="text-slate-400">Note:</strong> Leverage breakdown shows for all players in scraped rundles.
             Leverage split only applies after Day 12 when standings stabilize.
         </p>
     </div>
 
     <!-- Loading State -->
     <div x-show="loading" class="text-center py-8">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-        <p class="text-gray-500 mt-2">Loading distribution data...</p>
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mx-auto"></div>
+        <p class="text-slate-400 mt-2">Loading distribution data...</p>
     </div>
 
     <!-- Chart -->
-    <div x-show="!loading" class="bg-white rounded-lg shadow p-4 mb-6">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Average Surprise by Match Day</h3>
+    <div x-show="!loading" class="bg-slate-900 border border-slate-800 rounded-lg p-4 mb-6">
+        <h3 class="text-lg font-medium text-gray-100 mb-4">Average Surprise by Match Day</h3>
         <div class="h-96">
             <canvas id="distributionChart"></canvas>
         </div>
     </div>
 
     <!-- Data Table -->
-    <div x-show="!loading" class="bg-white rounded-lg shadow overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-200">
-            <h3 class="text-lg font-medium text-gray-900">Daily Breakdown</h3>
+    <div x-show="!loading" class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-700">
+            <h3 class="text-lg font-medium text-gray-100">Daily Breakdown</h3>
         </div>
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+            <table class="min-w-full divide-y divide-slate-700">
+                <thead class="bg-slate-800">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">All Players</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">High Leverage</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Low Leverage</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Difference</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Day</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">All Players</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">High Leverage</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Low Leverage</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Difference</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="divide-y divide-slate-800">
                     <template x-for="day in data.distribution" :key="day.match_day">
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900" x-text="'Day ' + day.match_day"></td>
+                        <tr class="hover:bg-slate-800">
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-100" x-text="'Day ' + day.match_day"></td>
                             <td class="px-4 py-3 whitespace-nowrap text-sm text-right"
-                                :class="day.avg_surprise_all > 0 ? 'text-green-600' : day.avg_surprise_all < 0 ? 'text-red-600' : 'text-gray-600'"
+                                :class="day.avg_surprise_all > 0 ? 'text-emerald-400' : day.avg_surprise_all < 0 ? 'text-red-400' : 'text-slate-400'"
                                 x-text="formatSurprise(day.avg_surprise_all)"></td>
                             <td class="px-4 py-3 whitespace-nowrap text-sm text-right"
-                                :class="day.avg_surprise_high > 0 ? 'text-green-600' : day.avg_surprise_high < 0 ? 'text-red-600' : 'text-gray-600'"
+                                :class="day.avg_surprise_high > 0 ? 'text-emerald-400' : day.avg_surprise_high < 0 ? 'text-red-400' : 'text-slate-400'"
                                 x-text="day.count_high > 0 ? formatSurprise(day.avg_surprise_high) : '-'"></td>
                             <td class="px-4 py-3 whitespace-nowrap text-sm text-right"
-                                :class="day.avg_surprise_low > 0 ? 'text-green-600' : day.avg_surprise_low < 0 ? 'text-red-600' : 'text-gray-600'"
+                                :class="day.avg_surprise_low > 0 ? 'text-emerald-400' : day.avg_surprise_low < 0 ? 'text-red-400' : 'text-slate-400'"
                                 x-text="day.count_low > 0 ? formatSurprise(day.avg_surprise_low) : '-'"></td>
-                            <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-500"
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-500"
                                 x-text="day.count_high > 0 && day.count_low > 0 ? formatSurprise(day.avg_surprise_high - day.avg_surprise_low) : '-'"></td>
                         </tr>
                     </template>
@@ -94,25 +94,25 @@
 
     <!-- Summary Stats -->
     <div x-show="!loading && data.distribution" class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-sm text-gray-500">Overall Avg Surprise</div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
+            <div class="text-sm text-slate-400">Overall Avg Surprise</div>
             <div class="text-2xl font-bold"
-                 :class="overallAvg > 0 ? 'text-green-600' : overallAvg < 0 ? 'text-red-600' : 'text-gray-600'"
+                 :class="overallAvg > 0 ? 'text-emerald-400' : overallAvg < 0 ? 'text-red-400' : 'text-slate-400'"
                  x-text="formatSurprise(overallAvg)"></div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-sm text-gray-500">Best Day</div>
-            <div class="text-2xl font-bold text-green-600" x-text="bestDay ? 'Day ' + bestDay.match_day : '-'"></div>
-            <div class="text-sm text-gray-500" x-text="bestDay ? formatSurprise(bestDay.avg_surprise_all) : ''"></div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
+            <div class="text-sm text-slate-400">Best Day</div>
+            <div class="text-2xl font-bold text-emerald-400" x-text="bestDay ? 'Day ' + bestDay.match_day : '-'"></div>
+            <div class="text-sm text-slate-500" x-text="bestDay ? formatSurprise(bestDay.avg_surprise_all) : ''"></div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-sm text-gray-500">Worst Day</div>
-            <div class="text-2xl font-bold text-red-600" x-text="worstDay ? 'Day ' + worstDay.match_day : '-'"></div>
-            <div class="text-sm text-gray-500" x-text="worstDay ? formatSurprise(worstDay.avg_surprise_all) : ''"></div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
+            <div class="text-sm text-slate-400">Worst Day</div>
+            <div class="text-2xl font-bold text-red-400" x-text="worstDay ? 'Day ' + worstDay.match_day : '-'"></div>
+            <div class="text-sm text-slate-500" x-text="worstDay ? formatSurprise(worstDay.avg_surprise_all) : ''"></div>
         </div>
-        <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-sm text-gray-500">Match Days</div>
-            <div class="text-2xl font-bold text-gray-900" x-text="data.distribution?.length || 0"></div>
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
+            <div class="text-sm text-slate-400">Match Days</div>
+            <div class="text-2xl font-bold text-gray-100" x-text="data.distribution?.length || 0"></div>
         </div>
     </div>
 </div>
@@ -165,8 +165,8 @@ function surpriseDistribution() {
                         {
                             label: 'All Players',
                             data: allData,
-                            borderColor: 'rgb(107, 114, 128)',
-                            backgroundColor: 'rgba(107, 114, 128, 0.1)',
+                            borderColor: 'rgb(148, 163, 184)',
+                            backgroundColor: 'rgba(148, 163, 184, 0.1)',
                             borderWidth: 2,
                             fill: false,
                             tension: 0.1,
@@ -174,8 +174,8 @@ function surpriseDistribution() {
                         {
                             label: 'High Leverage',
                             data: highData,
-                            borderColor: 'rgb(239, 68, 68)',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderColor: 'rgb(248, 113, 113)',
+                            backgroundColor: 'rgba(248, 113, 113, 0.1)',
                             borderWidth: 2,
                             fill: false,
                             tension: 0.1,
@@ -183,8 +183,8 @@ function surpriseDistribution() {
                         {
                             label: 'Low Leverage',
                             data: lowData,
-                            borderColor: 'rgb(59, 130, 246)',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderColor: 'rgb(96, 165, 250)',
+                            backgroundColor: 'rgba(96, 165, 250, 0.1)',
                             borderWidth: 2,
                             fill: false,
                             tension: 0.1,
@@ -217,9 +217,9 @@ function surpriseDistribution() {
                             grid: {
                                 color: function(context) {
                                     if (context.tick.value === 0) {
-                                        return 'rgba(0, 0, 0, 0.3)';
+                                        return 'rgba(148, 163, 184, 0.3)';
                                     }
-                                    return 'rgba(0, 0, 0, 0.1)';
+                                    return 'rgba(51, 65, 85, 0.5)';
                                 }
                             }
                         },

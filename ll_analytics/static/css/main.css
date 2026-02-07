@@ -1,8 +1,10 @@
-/* LL Analytics - Main Stylesheet */
+/* LL Analytics - Main Stylesheet (Dark Theme) */
 
 /* Base styles */
 body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #020617; /* slate-950 */
+    color: #f3f4f6; /* gray-100 */
 }
 
 /* Custom scrollbar */
@@ -12,17 +14,17 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: #0f172a; /* slate-900 */
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
+    background: #334155; /* slate-700 */
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #a1a1a1;
+    background: #475569; /* slate-600 */
 }
 
 /* Table styles */
@@ -32,46 +34,47 @@ body {
 }
 
 .data-table th {
-    background-color: #f9fafb;
+    background-color: #1e293b; /* slate-800 */
     padding: 12px 16px;
     text-align: left;
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #6b7280;
-    border-bottom: 1px solid #e5e7eb;
+    color: #94a3b8; /* slate-400 */
+    border-bottom: 1px solid #334155; /* slate-700 */
 }
 
 .data-table td {
     padding: 12px 16px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid #1e293b; /* slate-800 */
+    color: #f3f4f6; /* gray-100 */
 }
 
 .data-table tr:hover {
-    background-color: #f9fafb;
+    background-color: #1e293b; /* slate-800 */
 }
 
 /* Metric cards */
 .metric-card {
-    background: white;
+    background: #0f172a; /* slate-900 */
+    border: 1px solid #1e293b; /* slate-800 */
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     padding: 16px;
-    transition: box-shadow 0.2s;
+    transition: border-color 0.2s;
 }
 
 .metric-card:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-color: #334155; /* slate-700 */
 }
 
 /* Positive/negative indicators */
 .positive {
-    color: #059669;
+    color: #34d399; /* emerald-400 */
 }
 
 .negative {
-    color: #dc2626;
+    color: #f87171; /* red-400 */
 }
 
 /* Loading spinner */
@@ -79,8 +82,8 @@ body {
     display: inline-block;
     width: 24px;
     height: 24px;
-    border: 3px solid #e5e7eb;
-    border-top-color: #4f46e5;
+    border: 3px solid #1e293b; /* slate-800 */
+    border-top-color: #059669; /* emerald-600 */
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -96,6 +99,8 @@ body {
     position: relative;
     height: 300px;
     width: 100%;
+    background-color: #0f172a; /* slate-900 */
+    border-radius: 8px;
 }
 
 /* Responsive adjustments */
@@ -118,23 +123,23 @@ body {
 }
 
 .badge-green {
-    background-color: #d1fae5;
-    color: #065f46;
+    background-color: rgba(16, 185, 129, 0.15);
+    color: #34d399; /* emerald-400 */
 }
 
 .badge-red {
-    background-color: #fee2e2;
-    color: #991b1b;
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #f87171; /* red-400 */
 }
 
 .badge-blue {
-    background-color: #dbeafe;
-    color: #1e40af;
+    background-color: rgba(59, 130, 246, 0.15);
+    color: #60a5fa; /* blue-400 */
 }
 
 .badge-yellow {
-    background-color: #fef3c7;
-    color: #92400e;
+    background-color: rgba(234, 179, 8, 0.15);
+    color: #facc15; /* yellow-400 */
 }
 
 /* Tooltip */
@@ -149,14 +154,16 @@ body {
     left: 50%;
     transform: translateX(-50%);
     padding: 4px 8px;
-    background-color: #1f2937;
-    color: white;
+    background-color: #1e293b; /* slate-800 */
+    color: #f3f4f6;
     font-size: 12px;
     border-radius: 4px;
+    border: 1px solid #334155; /* slate-700 */
     white-space: nowrap;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.2s, visibility 0.2s;
+    z-index: 10;
 }
 
 .tooltip:hover::after {
@@ -171,7 +178,7 @@ body {
 
 .heatmap-cell:hover {
     transform: scale(1.15);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 .heatmap-correct {
@@ -183,5 +190,5 @@ body {
 }
 
 .heatmap-no-data {
-    background-color: #e5e7eb;
+    background-color: #334155; /* slate-700 — lighter for dark bg */
 }

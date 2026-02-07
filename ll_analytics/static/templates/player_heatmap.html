@@ -7,17 +7,17 @@
     <!-- Header -->
     <div class="mb-6 flex items-center justify-between">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">Performance Heatmap</h1>
-            <p class="text-gray-600 mt-1">
-                <a href="/player/{{ username }}" class="text-indigo-600 hover:underline">{{ username }}</a>
+            <h1 class="text-3xl font-bold text-gray-100">Performance Heatmap</h1>
+            <p class="text-slate-400 mt-1">
+                <a href="/player/{{ username }}" class="text-emerald-400 hover:text-emerald-300">{{ username }}</a>
                 - Season {{ season }}
             </p>
         </div>
-        <a href="/player/{{ username }}?season={{ season }}" class="text-indigo-600 hover:underline text-sm">&larr; Back to Profile</a>
+        <a href="/player/{{ username }}?season={{ season }}" class="text-emerald-400 hover:text-emerald-300 text-sm">&larr; Back to Profile</a>
     </div>
 
     <!-- Legend -->
-    <div class="flex gap-4 mb-4 text-sm">
+    <div class="flex gap-4 mb-4 text-sm text-slate-300">
         <div class="flex items-center gap-1">
             <div class="w-5 h-5 rounded heatmap-correct"></div>
             <span>Correct</span>
@@ -38,21 +38,21 @@
     </div>
 
     <!-- Heatmap Table -->
-    <div x-show="!loading" x-cloak class="bg-white rounded-lg shadow overflow-auto">
+    <div x-show="!loading" x-cloak class="bg-slate-900 border border-slate-800 rounded-lg overflow-auto">
         <table class="min-w-full">
-            <thead class="bg-gray-50">
+            <thead class="bg-slate-800">
                 <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Day</th>
                     <template x-for="q in 6">
-                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" x-text="'Q' + q"></th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" x-text="'Q' + q"></th>
                     </template>
-                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">TCA</th>
+                    <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">TCA</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody class="divide-y divide-slate-800">
                 <template x-for="day in days" :key="day">
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 text-sm font-medium text-gray-900" x-text="'Day ' + day"></td>
+                    <tr class="hover:bg-slate-800">
+                        <td class="px-4 py-2 text-sm font-medium text-gray-100" x-text="'Day ' + day"></td>
                         <template x-for="q in 6" :key="q">
                             <td class="px-4 py-2 text-center">
                                 <div
@@ -63,7 +63,7 @@
                                 ></div>
                             </td>
                         </template>
-                        <td class="px-4 py-2 text-center text-sm font-medium" x-text="getDayTCA(day)"></td>
+                        <td class="px-4 py-2 text-center text-sm font-medium text-gray-100" x-text="getDayTCA(day)"></td>
                     </tr>
                 </template>
             </tbody>
@@ -72,27 +72,27 @@
 
     <!-- Question Detail Modal -->
     <div x-show="selectedQuestion" x-cloak
-         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+         class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50"
          @click.self="selectedQuestion = null">
-        <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg mx-4" x-show="selectedQuestion">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-xl p-6 max-w-lg mx-4" x-show="selectedQuestion">
             <div class="flex justify-between items-start mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Question Detail</h3>
-                <button @click="selectedQuestion = null" class="text-gray-400 hover:text-gray-600">&times;</button>
+                <h3 class="text-lg font-medium text-gray-100">Question Detail</h3>
+                <button @click="selectedQuestion = null" class="text-slate-400 hover:text-gray-200">&times;</button>
             </div>
             <template x-if="selectedQuestion">
                 <div class="space-y-2">
                     <div class="text-sm">
-                        <span class="font-medium">Category:</span>
-                        <span x-text="selectedQuestion.category"></span>
+                        <span class="font-medium text-slate-400">Category:</span>
+                        <span class="text-gray-100" x-text="selectedQuestion.category"></span>
                     </div>
                     <div class="text-sm">
-                        <span class="font-medium">Result:</span>
-                        <span :class="selectedQuestion.correct ? 'text-green-600' : 'text-red-600'"
+                        <span class="font-medium text-slate-400">Result:</span>
+                        <span :class="selectedQuestion.correct ? 'text-emerald-400' : 'text-red-400'"
                               x-text="selectedQuestion.correct ? 'Correct' : 'Incorrect'"></span>
                     </div>
                     <div x-show="selectedQuestion.question_text" class="text-sm">
-                        <span class="font-medium">Question:</span>
-                        <p class="mt-1 text-gray-600" x-text="selectedQuestion.question_text"></p>
+                        <span class="font-medium text-slate-400">Question:</span>
+                        <p class="mt-1 text-slate-300" x-text="selectedQuestion.question_text"></p>
                     </div>
                 </div>
             </template>

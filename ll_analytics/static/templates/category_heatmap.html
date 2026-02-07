@@ -6,13 +6,13 @@
 <div x-data="categoryHeatmap()">
     <!-- Header -->
     <div class="mb-6">
-        <h1 class="text-3xl font-bold text-gray-900">Category Difficulty Heatmap</h1>
-        <p class="text-gray-600 mt-1">Season {{ season }} - Average CA% by category and match day</p>
+        <h1 class="text-3xl font-bold text-gray-100">Category Difficulty Heatmap</h1>
+        <p class="text-slate-400 mt-1">Season {{ season }} - Average CA% by category and match day</p>
     </div>
 
     <!-- Legend -->
-    <div class="flex gap-4 mb-4 text-sm items-center">
-        <span class="text-gray-600">Difficulty:</span>
+    <div class="flex gap-4 mb-4 text-sm items-center text-slate-300">
+        <span class="text-slate-400">Difficulty:</span>
         <div class="flex items-center gap-1">
             <div class="w-5 h-5 rounded" style="background-color: #ef4444;"></div>
             <span>Hard (0%)</span>
@@ -33,20 +33,20 @@
     </div>
 
     <!-- Heatmap -->
-    <div x-show="!loading" x-cloak class="bg-white rounded-lg shadow overflow-auto">
+    <div x-show="!loading" x-cloak class="bg-slate-900 border border-slate-800 rounded-lg overflow-auto">
         <table class="min-w-full">
-            <thead class="bg-gray-50">
+            <thead class="bg-slate-800">
                 <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10" style="min-width: 150px;">Category</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase sticky left-0 bg-slate-800 z-10" style="min-width: 150px;">Category</th>
                     <template x-for="day in days" :key="day">
-                        <th class="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase" x-text="day" style="min-width: 40px;"></th>
+                        <th class="px-2 py-3 text-center text-xs font-medium text-slate-400 uppercase" x-text="day" style="min-width: 40px;"></th>
                     </template>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody class="divide-y divide-slate-800">
                 <template x-for="cat in categories" :key="cat">
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 text-sm font-medium text-gray-900 whitespace-nowrap sticky left-0 bg-white z-10" x-text="cat"></td>
+                    <tr class="hover:bg-slate-800/50">
+                        <td class="px-4 py-2 text-sm font-medium text-gray-100 whitespace-nowrap sticky left-0 bg-slate-900 z-10" x-text="cat"></td>
                         <template x-for="day in days" :key="day">
                             <td class="px-1 py-1 text-center">
                                 <div
@@ -104,7 +104,7 @@ function categoryHeatmap() {
 
         getCellStyle(cat, day) {
             const val = this.getCellValue(cat, day);
-            if (val === null) return 'background-color: #e5e7eb;';
+            if (val === null) return 'background-color: #334155;'; /* slate-700 for no-data */
             // Red (0%) -> Yellow (50%) -> Green (100%)
             const pct = val;
             let r, g, b;

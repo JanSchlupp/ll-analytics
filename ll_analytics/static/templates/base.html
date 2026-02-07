@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}LL Analytics{% endblock %}</title>
 
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -21,19 +26,19 @@
         [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-slate-950 min-h-screen text-gray-100">
     <!-- Navigation -->
-    <nav class="bg-indigo-600 text-white shadow-lg">
+    <nav class="bg-slate-950 border-b border-slate-800">
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <a href="/" class="text-xl font-bold">LL Analytics</a>
+                    <a href="/" class="text-xl font-bold text-emerald-400">LL Analytics</a>
                     <div class="ml-10 flex space-x-4">
-                        <a href="/" class="px-3 py-2 rounded hover:bg-indigo-700">Standings</a>
-                        <a href="/surprise/distribution" class="px-3 py-2 rounded hover:bg-indigo-700">Surprise</a>
-                        <a href="/categories/heatmap" class="px-3 py-2 rounded hover:bg-indigo-700">Heatmaps</a>
-                        <a href="/compare" class="px-3 py-2 rounded hover:bg-indigo-700">Compare</a>
-                        <a href="/docs" class="px-3 py-2 rounded hover:bg-indigo-700">API Docs</a>
+                        <a href="/" class="px-3 py-2 rounded text-slate-300 hover:bg-slate-800 hover:text-gray-100">Standings</a>
+                        <a href="/surprise/distribution" class="px-3 py-2 rounded text-slate-300 hover:bg-slate-800 hover:text-gray-100">Surprise</a>
+                        <a href="/categories/heatmap" class="px-3 py-2 rounded text-slate-300 hover:bg-slate-800 hover:text-gray-100">Heatmaps</a>
+                        <a href="/compare" class="px-3 py-2 rounded text-slate-300 hover:bg-slate-800 hover:text-gray-100">Compare</a>
+                        <a href="/docs" class="px-3 py-2 rounded text-slate-300 hover:bg-slate-800 hover:text-gray-100">API Docs</a>
                     </div>
                 </div>
                 <!-- Player Search -->
@@ -48,16 +53,16 @@
                                @keydown.arrow-down.prevent="selectNext()"
                                @keydown.arrow-up.prevent="selectPrev()"
                                placeholder="Search players..."
-                               class="w-48 md:w-64 px-3 py-1.5 rounded-lg bg-indigo-500 text-white placeholder-indigo-300 border border-indigo-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm">
+                               class="w-48 md:w-64 px-3 py-1.5 rounded-lg bg-slate-800 text-gray-100 placeholder-slate-500 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm">
                         <!-- Results dropdown -->
                         <div x-show="showResults && results.length > 0"
                              x-cloak
                              @click.outside="showResults = false"
-                             class="absolute right-0 mt-1 w-full bg-white rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                             class="absolute right-0 mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
                             <template x-for="(player, index) in results" :key="player">
                                 <a :href="'/player/' + player"
-                                   class="block px-4 py-2 text-gray-800 hover:bg-indigo-100 text-sm"
-                                   :class="{ 'bg-indigo-50': index === selectedIndex }"
+                                   class="block px-4 py-2 text-gray-100 hover:bg-slate-700 text-sm"
+                                   :class="{ 'bg-slate-700': index === selectedIndex }"
                                    @mouseenter="selectedIndex = index"
                                    x-text="player"></a>
                             </template>
@@ -65,7 +70,7 @@
                         <!-- No results message -->
                         <div x-show="showResults && query.length >= 2 && results.length === 0 && !loading"
                              x-cloak
-                             class="absolute right-0 mt-1 w-full bg-white rounded-lg shadow-lg z-50 px-4 py-2 text-gray-500 text-sm">
+                             class="absolute right-0 mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-50 px-4 py-2 text-slate-400 text-sm">
                             No players found
                         </div>
                     </div>
@@ -80,10 +85,10 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-gray-800 text-gray-300 py-4 mt-auto">
+    <footer class="bg-slate-950 border-t border-slate-800 text-slate-400 py-4 mt-auto">
         <div class="max-w-7xl mx-auto px-4 text-center text-sm">
-            LL Analytics - Learned League Data Analysis
-            <span class="text-gray-500 ml-2">v1.4.0</span>
+            <div>LL Analytics - Learned League Data Analysis <span class="text-slate-600 ml-2">v1.4.0</span></div>
+            <div class="text-slate-500 mt-1">Independent fan project &mdash; not affiliated with LearnedLeague.com</div>
         </div>
     </footer>
 
