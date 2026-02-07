@@ -29,12 +29,9 @@ Chart.defaults.borderColor = '#1e293b';     // slate-800 for grid lines
 Chart.defaults.backgroundColor = 'transparent';
 Chart.defaults.plugins.legend.labels.color = '#cbd5e1'; // slate-300
 Chart.defaults.plugins.title.color = '#e2e8f0';         // slate-200
-Chart.defaults.scale.grid = {
-    color: 'rgba(51, 65, 85, 0.5)',  // slate-700 at 50%
-};
-Chart.defaults.scale.ticks = {
-    color: '#94a3b8', // slate-400
-};
+// Merge into existing defaults instead of replacing the entire object
+Chart.defaults.scale.grid.color = 'rgba(51, 65, 85, 0.5)';  // slate-700 at 50%
+Chart.defaults.scale.ticks.color = '#94a3b8'; // slate-400
 
 /**
  * Create a line chart for time series data

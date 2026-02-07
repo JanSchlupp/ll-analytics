@@ -91,7 +91,9 @@
         <!-- Match Day Chart -->
         <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
             <h3 class="text-lg font-medium text-gray-100 mb-4">Performance by Match Day</h3>
-            <canvas id="matchDayChart" height="200"></canvas>
+            <div style="position: relative; width: 100%; height: 200px;">
+                <canvas id="matchDayChart"></canvas>
+            </div>
         </div>
 
         <!-- Lifetime Category Stats -->
@@ -691,6 +693,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false }
                 },
@@ -718,6 +721,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false }
                 },
