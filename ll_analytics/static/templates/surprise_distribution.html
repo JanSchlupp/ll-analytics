@@ -149,7 +149,9 @@ function surpriseDistribution() {
 
         async init() {
             await this.fetchData();
-            this.$nextTick(() => this.renderChart());
+            // Use setTimeout to ensure the canvas is visible and laid out
+            // before Chart.js tries to read its dimensions
+            setTimeout(() => this.renderChart(), 50);
         },
 
         async fetchData() {
