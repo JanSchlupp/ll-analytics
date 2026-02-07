@@ -284,7 +284,56 @@ function playerSearch() {
     };
 }
 
+// Sort utility - handles nulls, numeric vs string comparison
+function sortArray(arr, key, dir) {
+    return [...arr].sort((a, b) => {
+        let aVal = a[key];
+        let bVal = b[key];
+        // Nulls/undefined always last
+        if (aVal == null && bVal == null) return 0;
+        if (aVal == null) return 1;
+        if (bVal == null) return -1;
+        // Numeric sort if both are numbers
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+            return dir === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+        // String sort
+        const cmp = String(aVal).localeCompare(String(bVal));
+        return dir === 'asc' ? cmp : -cmp;
+    });
+}
+
+// Reusable Alpine component for Jinja-converted tables
+function sortableTable(config) {
+    return {
+        rows: config.rows || [],
+        sortKey: config.defaultSort || '',
+        sortDir: config.defaultDir || 'asc',
+
+        sort(key) {
+            if (this.sortKey === key) {
+                this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortKey = key;
+                this.sortDir = 'asc';
+            }
+        },
+
+        get sortedRows() {
+            if (!this.sortKey) return this.rows;
+            return sortArray(this.rows, this.sortKey, this.sortDir);
+        },
+
+        sortIcon(key) {
+            if (this.sortKey !== key) return '';
+            return this.sortDir;
+        },
+    };
+}
+
 // Export for use in templates
 window.API = API;
 window.Utils = Utils;
 window.playerSearch = playerSearch;
+window.sortArray = sortArray;
+window.sortableTable = sortableTable;

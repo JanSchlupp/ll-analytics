@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Query
 
 from ...database import get_connection
+from ...cache import response_cache
 from ...metrics.surprise import calculate_expected_probability, calculate_surprise
 
 router = APIRouter()
@@ -113,6 +114,11 @@ async def dashboard_data(
     """
     Dashboard widget data: movers, category difficulty, quick stats.
     """
+    cache_key = f"dashboard:{season_id}:{rundle_id}"
+    cached = response_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     with get_connection() as conn:
         if not season_id:
             season = conn.execute(
@@ -205,11 +211,13 @@ async def dashboard_data(
             "seasonProgress": season_progress,
         }
 
-        return {
+        result = {
             "movers": movers,
             "category_difficulty": category_difficulty,
             "stats": stats,
         }
+        response_cache.set(cache_key, result)
+        return result
 
 
 def _get_avg_surprise_for_days(

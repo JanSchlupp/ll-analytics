@@ -5,6 +5,7 @@ from typing import Optional
 
 from ...config import Config
 from ...database import get_connection
+from ...cache import response_cache
 from ...metrics.surprise import SurpriseMetric
 
 router = APIRouter()
@@ -22,6 +23,11 @@ async def surprise_distribution(
 
     Split by player leverage (only after day 12 when standings stabilize).
     """
+    cache_key = f"surprise_dist:{season}:{rundle}"
+    cached = response_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     with get_connection() as conn:
         season_row = conn.execute(
             "SELECT id FROM seasons WHERE season_number = ?", (season,)
@@ -37,7 +43,9 @@ async def surprise_distribution(
             leverage_start_day=Config.LEVERAGE_START_DAY,
         )
 
-        return {"season": season, "rundle": rundle, **result}
+        resp = {"season": season, "rundle": rundle, **result}
+        response_cache.set(cache_key, resp)
+        return resp
 
 
 @router.get("/surprise/questions/{username}")

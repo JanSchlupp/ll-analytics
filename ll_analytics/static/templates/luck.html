@@ -177,17 +177,17 @@
                 <table class="min-w-full divide-y divide-slate-700">
                     <thead class="bg-slate-800">
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Day</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Opponent</th>
-                            <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Result</th>
-                            <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Score</th>
-                            <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Opp TCA</th>
-                            <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Opp Avg</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Luck</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDetails('match_day')">Day <span class="sort-arrow" :class="detailSortIcon('match_day')"></span></th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDetails('opponent')">Opponent <span class="sort-arrow" :class="detailSortIcon('opponent')"></span></th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDetails('result')">Result <span class="sort-arrow" :class="detailSortIcon('result')"></span></th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDetails('your_score')">Score <span class="sort-arrow" :class="detailSortIcon('your_score')"></span></th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDetails('opponent_tca')">Opp TCA <span class="sort-arrow" :class="detailSortIcon('opponent_tca')"></span></th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDetails('opponent_avg')">Opp Avg <span class="sort-arrow" :class="detailSortIcon('opponent_avg')"></span></th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDetails('luck')">Luck <span class="sort-arrow" :class="detailSortIcon('luck')"></span></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
-                        <template x-for="match in data.details" :key="match.match_day">
+                        <template x-for="match in sortedDetails" :key="match.match_day">
                             <tr class="hover:bg-slate-800 cursor-pointer" @click="showMatchDetail(match.match_day)">
                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-100" x-text="match.match_day"></td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-100" x-text="match.opponent"></td>
@@ -289,14 +289,14 @@
                 <table class="min-w-full divide-y divide-slate-700">
                     <thead class="bg-slate-800">
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Rank</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Player</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Luck</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Weighted</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortLb('rank')">Rank <span class="sort-arrow" :class="lbSortIcon('rank')"></span></th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortLb('username')">Player <span class="sort-arrow" :class="lbSortIcon('username')"></span></th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortLb('total_luck')">Luck <span class="sort-arrow" :class="lbSortIcon('total_luck')"></span></th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortLb('weighted_luck')">Weighted <span class="sort-arrow" :class="lbSortIcon('weighted_luck')"></span></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
-                        <template x-for="entry in leaderboard" :key="entry.username">
+                        <template x-for="entry in sortedLeaderboard" :key="entry.username">
                             <tr :class="entry.username === '{{ username }}' ? 'bg-emerald-900/20 font-medium' : 'hover:bg-slate-800'">
                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-100" x-text="entry.rank"></td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm"
@@ -333,6 +333,48 @@ function luckAnalysis() {
         showModal: false,
         modalLoading: false,
         matchDetail: null,
+
+        // Sort state for All Matches table
+        detailSortKey: 'match_day',
+        detailSortDir: 'asc',
+        sortDetails(key) {
+            if (this.detailSortKey === key) {
+                this.detailSortDir = this.detailSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.detailSortKey = key;
+                this.detailSortDir = 'asc';
+            }
+        },
+        get sortedDetails() {
+            if (!this.data.details) return [];
+            if (!this.detailSortKey) return this.data.details;
+            return sortArray(this.data.details, this.detailSortKey, this.detailSortDir);
+        },
+        detailSortIcon(key) {
+            if (this.detailSortKey !== key) return '';
+            return this.detailSortDir;
+        },
+
+        // Sort state for Luck Rankings table
+        lbSortKey: 'rank',
+        lbSortDir: 'asc',
+        sortLb(key) {
+            if (this.lbSortKey === key) {
+                this.lbSortDir = this.lbSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.lbSortKey = key;
+                this.lbSortDir = 'asc';
+            }
+        },
+        get sortedLeaderboard() {
+            if (!this.leaderboard.length) return [];
+            if (!this.lbSortKey) return this.leaderboard;
+            return sortArray(this.leaderboard, this.lbSortKey, this.lbSortDir);
+        },
+        lbSortIcon(key) {
+            if (this.lbSortKey !== key) return '';
+            return this.lbSortDir;
+        },
 
         async init() {
             await Promise.all([

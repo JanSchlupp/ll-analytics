@@ -9,7 +9,9 @@ Uses information theory (log-odds combination and surprisal):
 - Expected probability is computed by combining evidence from player history
   and question difficulty in log-odds space (like logistic regression)
 - Surprise is measured as log2(1/P) for the observed outcome, signed by
-  whether it was an over- or under-performance
+  whether it was an over- or under-performance, then bias-corrected by
+  subtracting the expected surprise given p so that a calibrated player
+  averages exactly 0 regardless of skill level
 
 A positive surprise means the player did better than expected.
 A negative surprise means they did worse than expected.
@@ -103,31 +105,36 @@ def calculate_expected_probability(
 
 def calculate_surprise(actual_correct: bool, expected_prob: float) -> float:
     """
-    Calculate information-theoretic surprise score for a single question.
+    Calculate bias-corrected surprise score for a single question.
 
     Uses surprisal (self-information): -log2(P) measures how "surprising"
-    an event is. We sign it based on over/under performance:
-    - Correct when unlikely (P low) -> large positive surprise
-    - Wrong when likely (P high) -> large negative surprise
+    an event is, signed by over/under performance. Then subtracts the
+    expected surprise given p, so that a perfectly calibrated player
+    averages exactly 0 regardless of skill level or question difficulty.
+
+    Without this correction, E[surprise] = -p*log2(p) + (1-p)*log2(1-p),
+    which is negative for p > 0.5 and positive for p < 0.5 — creating a
+    systematic bias that confounds comparisons across skill levels.
 
     Args:
         actual_correct: Whether the player got it correct
         expected_prob: Expected probability of getting it correct
 
     Returns:
-        Signed surprise score (positive = better than expected, negative = worse)
+        Bias-corrected surprise score (positive = better than expected, negative = worse)
     """
     # Clamp to avoid log(0)
     p = max(0.001, min(0.999, expected_prob))
 
     if actual_correct:
-        # Got it right - surprise is how unlikely that was
-        # More surprising (positive) when expected_prob was low
-        return -log2(p)  # Positive: ~0.01 (p≈1) to ~10 (p≈0.001)
+        raw = -log2(p)
     else:
-        # Got it wrong - surprise is how unlikely THAT was
-        # More surprising (negative) when expected_prob was HIGH (you should've got it)
-        return log2(1 - p)  # Negative: ~-10 (p≈0.999) to ~-0.01 (p≈0.001)
+        raw = log2(1 - p)
+
+    # Subtract expected surprise so E[adjusted] = 0 for calibrated players
+    expected_surprise = p * (-log2(p)) + (1 - p) * log2(1 - p)
+
+    return raw - expected_surprise
 
 
 @metric

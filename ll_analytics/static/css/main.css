@@ -181,6 +181,33 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
+/* Sortable table headers */
+.sortable-th {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sortable-th:hover {
+    color: #e2e8f0; /* slate-200 */
+}
+
+.sort-arrow::after {
+    content: '⇅';
+    margin-left: 4px;
+    opacity: 0.4;
+    font-size: 0.75em;
+}
+
+.sort-arrow.asc::after {
+    content: '▲';
+    opacity: 1;
+}
+
+.sort-arrow.desc::after {
+    content: '▼';
+    opacity: 1;
+}
+
 .heatmap-correct {
     background-color: #22c55e;
 }

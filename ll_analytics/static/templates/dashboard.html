@@ -55,13 +55,15 @@
                         <thead class="bg-slate-800">
                             <tr>
                                 <template x-for="col in result?.columns || []" :key="col">
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider"
-                                        x-text="col"></th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider sortable-th"
+                                        @click="sortLb(colKey(col))">
+                                        <span x-text="col"></span> <span class="sort-arrow" :class="lbSortIcon(colKey(col))"></span>
+                                    </th>
                                 </template>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-800">
-                            <template x-for="(row, idx) in result?.data || []" :key="idx">
+                            <template x-for="(row, idx) in sortedData" :key="idx">
                                 <tr class="hover:bg-slate-800">
                                     <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-100"
                                         x-text="row.rank"></td>
@@ -140,6 +142,39 @@ function dashboard() {
         loading: false,
         chart: null,
 
+        // Sort state for leaderboard
+        lbSortKey: '',
+        lbSortDir: 'asc',
+        sortLb(key) {
+            if (this.lbSortKey === key) {
+                this.lbSortDir = this.lbSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.lbSortKey = key;
+                this.lbSortDir = 'asc';
+            }
+        },
+        get sortedData() {
+            if (!this.result?.data) return [];
+            if (!this.lbSortKey) return this.result.data;
+            return sortArray(this.result.data, this.lbSortKey, this.lbSortDir);
+        },
+        lbSortIcon(key) {
+            if (this.lbSortKey !== key) return '';
+            return this.lbSortDir;
+        },
+        // Map display column names to data keys
+        colKey(col) {
+            const map = {
+                'Rank': 'rank', '#': 'rank',
+                'Player': 'username', 'Username': 'username',
+                'Total Surprise': 'total_surprise', 'Surprise': 'total_surprise',
+                'Avg Surprise': 'avg_surprise', 'Average': 'avg_surprise',
+                'Questions': 'questions', 'Count': 'questions',
+                'Score': 'score', 'Value': 'value',
+            };
+            return map[col] || col.toLowerCase().replace(/\s+/g, '_');
+        },
+
         async init() {
             // Load available metrics
             const metricsRes = await fetch('/api/metrics');
@@ -157,6 +192,8 @@ function dashboard() {
 
             this.loading = true;
             this.result = null;
+            this.lbSortKey = '';
+            this.lbSortDir = 'asc';
 
             try {
                 const res = await fetch(

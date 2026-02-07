@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 
 from ...database import get_connection
+from ...cache import response_cache
 from ...metrics.luck import LuckMetric, Scope
 
 router = APIRouter()
@@ -35,6 +36,11 @@ async def get_luck_leaderboard(
     rundle: str = Query(..., description="Rundle name"),
 ):
     """Get luck leaderboard for a rundle."""
+    cache_key = f"luck_lb:{season}:{rundle}"
+    cached = response_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     with get_connection() as conn:
         season_num, season_row = _resolve_season(conn, season)
 
@@ -48,7 +54,9 @@ async def get_luck_leaderboard(
 
         result = _luck.calculate(conn, Scope.RUNDLE, rundle_id=rundle_row["id"])
 
-        return {"rundle": rundle, "season": season_num, "leaderboard": result.data}
+        resp = {"rundle": rundle, "season": season_num, "leaderboard": result.data}
+        response_cache.set(cache_key, resp)
+        return resp
 
 
 @router.get("/luck/{username}")
@@ -57,6 +65,11 @@ async def get_player_luck(
     season: int = Query(default=None, description="Season number"),
 ):
     """Get luck analysis for a specific player."""
+    cache_key = f"luck_player:{username}:{season}"
+    cached = response_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     with get_connection() as conn:
         player = conn.execute(
             "SELECT id FROM players WHERE ll_username = ?", (username,)
@@ -69,7 +82,9 @@ async def get_player_luck(
 
         result = _luck.calculate(conn, Scope.PLAYER, player_id=player["id"], season_id=season_row["id"])
 
-        return result.data
+        resp = result.data
+        response_cache.set(cache_key, resp)
+        return resp
 
 
 @router.get("/match-detail/{username}/{match_day}")

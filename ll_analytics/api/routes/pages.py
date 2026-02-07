@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ...config import Config, LL_CATEGORIES
 from ...database import get_connection
+from ...cache import response_cache
 from ...metrics import MetricRegistry, Scope
 
 # Template directory
@@ -76,12 +77,18 @@ async def home(request: Request, rundle: Optional[int] = Query(None)):
                 ORDER BY pr.final_rank
             """, (season["id"], season["id"], current_rundle["id"])).fetchall()
 
+        standings_list = []
+        for s in standings:
+            d = dict(s)
+            d["ca_pct"] = round(d["tca"] / d["total_q"] * 100, 1) if d.get("total_q") else None
+            standings_list.append(d)
+
         return templates.TemplateResponse("home.html", {
             "request": request,
             "season": dict(season),
             "rundles": [dict(r) for r in rundles],
             "current_rundle": dict(current_rundle) if current_rundle else None,
-            "standings": [dict(s) for s in standings],
+            "standings": standings_list,
             "metrics": MetricRegistry.all_info(),
         })
 
@@ -136,9 +143,9 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
         # For backward compat: category_stats = lifetime if available, else season
         category_stats = lifetime_category_stats or season_category_stats
 
-        match_results = []
+        match_results_raw = []
         if season_row:
-            match_results = conn.execute("""
+            match_results_raw = conn.execute("""
                 SELECT
                     q.match_day,
                     COUNT(*) as questions,
@@ -149,6 +156,12 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
                 GROUP BY q.match_day
                 ORDER BY q.match_day
             """, (player["id"], season_row["id"])).fetchall()
+
+        match_results = []
+        for m in match_results_raw:
+            d = dict(m)
+            d["pct"] = round(d["correct"] / d["questions"] * 100, 0) if d.get("questions") else None
+            match_results.append(d)
 
         totals = conn.execute("""
             SELECT
@@ -193,26 +206,31 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
             """, (player["id"], player["id"], player["id"], player["id"],
                   player["id"], player["id"], season_row["id"], player["id"], player["id"])).fetchall()
 
-        metrics_data = {}
-        for metric_obj in MetricRegistry.all():
-            if Scope.PLAYER in metric_obj.scopes:
-                try:
-                    result = metric_obj.calculate(
-                        conn, Scope.PLAYER,
-                        player_id=player["id"],
-                        season_id=season_row["id"] if season_row else None
-                    )
-                    metrics_data[metric_obj.id] = {
-                        "name": metric_obj.name,
-                        "description": metric_obj.description,
-                        "result": result.to_dict() if result else None
-                    }
-                except Exception as e:
-                    metrics_data[metric_obj.id] = {
-                        "name": metric_obj.name,
-                        "description": metric_obj.description,
-                        "error": str(e)
-                    }
+        season_id_val = season_row["id"] if season_row else None
+        cache_key = f"player_metrics:{player['id']}:{season_id_val}"
+        metrics_data = response_cache.get(cache_key)
+        if metrics_data is None:
+            metrics_data = {}
+            for metric_obj in MetricRegistry.all():
+                if Scope.PLAYER in metric_obj.scopes:
+                    try:
+                        result = metric_obj.calculate(
+                            conn, Scope.PLAYER,
+                            player_id=player["id"],
+                            season_id=season_id_val
+                        )
+                        metrics_data[metric_obj.id] = {
+                            "name": metric_obj.name,
+                            "description": metric_obj.description,
+                            "result": result.to_dict() if result else None
+                        }
+                    except Exception as e:
+                        metrics_data[metric_obj.id] = {
+                            "name": metric_obj.name,
+                            "description": metric_obj.description,
+                            "error": str(e)
+                        }
+            response_cache.set(cache_key, metrics_data)
 
         return templates.TemplateResponse("player.html", {
             "request": request,

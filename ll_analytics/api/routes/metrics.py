@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 
 from ...database import get_connection
+from ...cache import response_cache
 from ...metrics import MetricRegistry, Scope
 
 router = APIRouter()
@@ -113,6 +114,12 @@ async def calculate_season_metric(
         season_number: The season number
         use_cache: Whether to use cached results
     """
+    cache_key = f"metric_season:{metric_id}:{season_number}"
+    if use_cache:
+        cached = response_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
     metric = MetricRegistry.get(metric_id)
     if not metric:
         raise HTTPException(status_code=404, detail=f"Metric '{metric_id}' not found")
@@ -140,7 +147,9 @@ async def calculate_season_metric(
                 use_cache=use_cache,
                 season_id=season["id"],
             )
-            return result.to_dict()
+            resp = result.to_dict()
+            response_cache.set(cache_key, resp)
+            return resp
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -159,6 +168,12 @@ async def calculate_rundle_metric(
         rundle_id: The rundle ID
         use_cache: Whether to use cached results
     """
+    cache_key = f"metric_rundle:{metric_id}:{rundle_id}"
+    if use_cache:
+        cached = response_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
     metric = MetricRegistry.get(metric_id)
     if not metric:
         raise HTTPException(status_code=404, detail=f"Metric '{metric_id}' not found")
@@ -183,7 +198,9 @@ async def calculate_rundle_metric(
                 use_cache=use_cache,
                 rundle_id=rundle_id,
             )
-            return result.to_dict()
+            resp = result.to_dict()
+            response_cache.set(cache_key, resp)
+            return resp
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -257,19 +274,24 @@ async def clear_metric_cache(metric_id: str):
     """
     Clear cached results for a metric.
 
+    Clears both the SQLite metric cache and the in-memory response cache.
+
     Args:
         metric_id: The metric to clear cache for, or "all" to clear everything
     """
     with get_connection() as conn:
         if metric_id == "all":
             count = MetricRegistry.clear_cache(conn)
+            mem_count = response_cache.clear()
         else:
             metric = MetricRegistry.get(metric_id)
             if not metric:
                 raise HTTPException(status_code=404, detail=f"Metric '{metric_id}' not found")
             count = MetricRegistry.clear_cache(conn, metric_id)
+            mem_count = response_cache.clear(f"metric_season:{metric_id}:") + \
+                        response_cache.clear(f"metric_rundle:{metric_id}:")
 
-        return {"cleared": count, "metric": metric_id}
+        return {"cleared": count, "memory_cleared": mem_count, "metric": metric_id}
 
 
 @router.get("/compare")

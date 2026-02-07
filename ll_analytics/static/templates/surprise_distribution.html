@@ -63,15 +63,15 @@
             <table class="min-w-full divide-y divide-slate-700">
                 <thead class="bg-slate-800">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Day</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">All Players</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">High Leverage</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Low Leverage</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Difference</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDist('match_day')">Day <span class="sort-arrow" :class="distSortIcon('match_day')"></span></th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDist('avg_surprise_all')">All Players <span class="sort-arrow" :class="distSortIcon('avg_surprise_all')"></span></th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDist('avg_surprise_high')">High Leverage <span class="sort-arrow" :class="distSortIcon('avg_surprise_high')"></span></th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDist('avg_surprise_low')">Low Leverage <span class="sort-arrow" :class="distSortIcon('avg_surprise_low')"></span></th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase sortable-th" @click="sortDist('difference')">Difference <span class="sort-arrow" :class="distSortIcon('difference')"></span></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800">
-                    <template x-for="day in data.distribution" :key="day.match_day">
+                    <template x-for="day in sortedDistribution" :key="day.match_day">
                         <tr class="hover:bg-slate-800">
                             <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-100" x-text="'Day ' + day.match_day"></td>
                             <td class="px-4 py-3 whitespace-nowrap text-sm text-right"
@@ -84,7 +84,7 @@
                                 :class="day.avg_surprise_low > 0 ? 'text-emerald-400' : day.avg_surprise_low < 0 ? 'text-red-400' : 'text-slate-400'"
                                 x-text="day.count_low > 0 ? formatSurprise(day.avg_surprise_low) : '-'"></td>
                             <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-500"
-                                x-text="day.count_high > 0 && day.count_low > 0 ? formatSurprise(day.avg_surprise_high - day.avg_surprise_low) : '-'"></td>
+                                x-text="day.difference != null ? formatSurprise(day.difference) : '-'"></td>
                         </tr>
                     </template>
                 </tbody>
@@ -126,6 +126,27 @@ function surpriseDistribution() {
         loading: true,
         chart: null,
 
+        // Sort state for daily breakdown table
+        distSortKey: 'match_day',
+        distSortDir: 'asc',
+        sortDist(key) {
+            if (this.distSortKey === key) {
+                this.distSortDir = this.distSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.distSortKey = key;
+                this.distSortDir = 'asc';
+            }
+        },
+        get sortedDistribution() {
+            if (!this.data.distribution) return [];
+            if (!this.distSortKey) return this.data.distribution;
+            return sortArray(this.data.distribution, this.distSortKey, this.distSortDir);
+        },
+        distSortIcon(key) {
+            if (this.distSortKey !== key) return '';
+            return this.distSortDir;
+        },
+
         async init() {
             await this.fetchData();
             this.$nextTick(() => this.renderChart());
@@ -136,6 +157,14 @@ function surpriseDistribution() {
             try {
                 const response = await fetch(`/api/metrics/surprise/distribution?season={{ season }}`);
                 this.data = await response.json();
+                // Pre-compute difference field for sorting
+                if (this.data.distribution) {
+                    this.data.distribution.forEach(day => {
+                        day.difference = (day.count_high > 0 && day.count_low > 0)
+                            ? day.avg_surprise_high - day.avg_surprise_low
+                            : null;
+                    });
+                }
             } catch (e) {
                 console.error('Failed to fetch distribution data:', e);
             }

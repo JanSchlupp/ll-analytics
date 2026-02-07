@@ -513,64 +513,70 @@
     <!-- Categories Tab -->
     <div x-show="activeTab === 'categories'" class="space-y-6">
         {% if season_category_stats %}
-        <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden"
+             x-data="sortableTable({ rows: {{ season_category_stats | tojson }}, defaultSort: 'correct_pct', defaultDir: 'desc' })">
             <div class="px-6 py-3 border-b border-slate-700">
                 <h3 class="text-lg font-medium text-gray-100">Season {{ season.season_number }} Performance</h3>
             </div>
             <table class="min-w-full divide-y divide-slate-700">
                 <thead class="bg-slate-800">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Category</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Correct %</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Questions</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('name')">Category <span class="sort-arrow" :class="sortIcon('name')"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('correct_pct')">Correct % <span class="sort-arrow" :class="sortIcon('correct_pct')"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('total_questions')">Questions <span class="sort-arrow" :class="sortIcon('total_questions')"></span></th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Performance</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800">
-                    {% for cat in season_category_stats %}
-                    <tr class="hover:bg-slate-800">
-                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-100">{{ cat.name }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-gray-100">{{ "%.1f"|format((cat.correct_pct or 0) * 100) }}%</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-slate-400">{{ cat.total_questions or '-' }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="w-32 bg-slate-700 rounded-full h-2">
-                                <div class="{% if (cat.correct_pct or 0) >= 0.7 %}bg-emerald-500{% elif (cat.correct_pct or 0) >= 0.5 %}bg-yellow-500{% else %}bg-red-500{% endif %} h-2 rounded-full" style="width: {{ (cat.correct_pct or 0) * 100 }}%"></div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
+                    <template x-for="cat in sortedRows" :key="cat.name">
+                        <tr class="hover:bg-slate-800">
+                            <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-100" x-text="cat.name"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-gray-100" x-text="((cat.correct_pct || 0) * 100).toFixed(1) + '%'"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-slate-400" x-text="cat.total_questions || '-'"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="w-32 bg-slate-700 rounded-full h-2">
+                                    <div class="h-2 rounded-full"
+                                         :class="(cat.correct_pct || 0) >= 0.7 ? 'bg-emerald-500' : (cat.correct_pct || 0) >= 0.5 ? 'bg-yellow-500' : 'bg-red-500'"
+                                         :style="'width: ' + ((cat.correct_pct || 0) * 100) + '%'"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
                 </tbody>
             </table>
         </div>
         {% endif %}
 
         {% if lifetime_category_stats %}
-        <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden"
+             x-data="sortableTable({ rows: {{ lifetime_category_stats | tojson }}, defaultSort: 'correct_pct', defaultDir: 'desc' })">
             <div class="px-6 py-3 border-b border-slate-700">
                 <h3 class="text-lg font-medium text-gray-100">Lifetime Performance</h3>
             </div>
             <table class="min-w-full divide-y divide-slate-700">
                 <thead class="bg-slate-800">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Category</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Correct %</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Questions</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('name')">Category <span class="sort-arrow" :class="sortIcon('name')"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('correct_pct')">Correct % <span class="sort-arrow" :class="sortIcon('correct_pct')"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('total_questions')">Questions <span class="sort-arrow" :class="sortIcon('total_questions')"></span></th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Performance</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800">
-                    {% for cat in lifetime_category_stats %}
-                    <tr class="hover:bg-slate-800">
-                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-100">{{ cat.name }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-gray-100">{{ "%.1f"|format((cat.correct_pct or 0) * 100) }}%</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-slate-400">{{ cat.total_questions or 0 }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="w-32 bg-slate-700 rounded-full h-2">
-                                <div class="{% if (cat.correct_pct or 0) >= 0.7 %}bg-emerald-500{% elif (cat.correct_pct or 0) >= 0.5 %}bg-yellow-500{% else %}bg-red-500{% endif %} h-2 rounded-full" style="width: {{ (cat.correct_pct or 0) * 100 }}%"></div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
+                    <template x-for="cat in sortedRows" :key="cat.name">
+                        <tr class="hover:bg-slate-800">
+                            <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-100" x-text="cat.name"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-gray-100" x-text="((cat.correct_pct || 0) * 100).toFixed(1) + '%'"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-slate-400" x-text="cat.total_questions || 0"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="w-32 bg-slate-700 rounded-full h-2">
+                                    <div class="h-2 rounded-full"
+                                         :class="(cat.correct_pct || 0) >= 0.7 ? 'bg-emerald-500' : (cat.correct_pct || 0) >= 0.5 ? 'bg-yellow-500' : 'bg-red-500'"
+                                         :style="'width: ' + ((cat.correct_pct || 0) * 100) + '%'"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
                 </tbody>
             </table>
         </div>
@@ -585,67 +591,63 @@
     <div x-show="activeTab === 'matches'">
         {% if h2h_matches %}
         <!-- Head-to-head match results from matches table -->
-        <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden"
+             x-data="sortableTable({ rows: {{ h2h_matches | tojson }}, defaultSort: 'match_day', defaultDir: 'asc' })">
             <table class="min-w-full divide-y divide-slate-700">
                 <thead class="bg-slate-800">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Day</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Opponent</th>
-                        <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Result</th>
-                        <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Score</th>
-                        <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">TCA</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('match_day')">Day <span class="sort-arrow" :class="sortIcon('match_day')"></span></th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('opponent')">Opponent <span class="sort-arrow" :class="sortIcon('opponent')"></span></th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('result')">Result <span class="sort-arrow" :class="sortIcon('result')"></span></th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('my_score')">Score <span class="sort-arrow" :class="sortIcon('my_score')"></span></th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('my_tca')">TCA <span class="sort-arrow" :class="sortIcon('my_tca')"></span></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800">
-                    {% for match in h2h_matches %}
-                    <tr class="hover:bg-slate-800">
-                        <td class="px-4 py-3 whitespace-nowrap font-medium text-gray-100">{{ match.match_day }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">
-                            <a href="/player/{{ match.opponent }}" class="text-emerald-400 hover:text-emerald-300">{{ match.opponent }}</a>
-                        </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-center">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                {% if match.result == 'W' %}bg-emerald-900/40 text-emerald-400
-                                {% elif match.result == 'L' %}bg-red-900/40 text-red-400
-                                {% else %}bg-slate-700 text-slate-300{% endif %}">
-                                {{ match.result }}
-                            </span>
-                        </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-center text-gray-100">
-                            {{ match.my_score }}-{{ match.opp_score }}
-                        </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-center text-slate-400">{{ match.my_tca }}/6</td>
-                    </tr>
-                    {% endfor %}
+                    <template x-for="match in sortedRows" :key="match.match_day + match.opponent">
+                        <tr class="hover:bg-slate-800">
+                            <td class="px-4 py-3 whitespace-nowrap font-medium text-gray-100" x-text="match.match_day"></td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <a :href="'/player/' + match.opponent" class="text-emerald-400 hover:text-emerald-300" x-text="match.opponent"></a>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-center">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                      :class="match.result === 'W' ? 'bg-emerald-900/40 text-emerald-400' : match.result === 'L' ? 'bg-red-900/40 text-red-400' : 'bg-slate-700 text-slate-300'"
+                                      x-text="match.result"></span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-center text-gray-100" x-text="match.my_score + '-' + match.opp_score"></td>
+                            <td class="px-4 py-3 whitespace-nowrap text-center text-slate-400" x-text="match.my_tca + '/6'"></td>
+                        </tr>
+                    </template>
                 </tbody>
             </table>
         </div>
         {% elif match_results %}
         <!-- Per-question results from answers table -->
-        <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden"
+             x-data="sortableTable({ rows: {{ match_results | tojson }}, defaultSort: 'match_day', defaultDir: 'asc' })">
             <table class="min-w-full divide-y divide-slate-700">
                 <thead class="bg-slate-800">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Match Day</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Correct</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Total</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Percentage</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('match_day')">Match Day <span class="sort-arrow" :class="sortIcon('match_day')"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('correct')">Correct <span class="sort-arrow" :class="sortIcon('correct')"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('questions')">Total <span class="sort-arrow" :class="sortIcon('questions')"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase sortable-th" @click="sort('pct')">Percentage <span class="sort-arrow" :class="sortIcon('pct')"></span></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800">
-                    {% for match in match_results %}
-                    <tr class="hover:bg-slate-800">
-                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-100">Day {{ match.match_day }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-gray-100">{{ match.correct }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-slate-400">{{ match.questions }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            {% set pct = match.correct / match.questions * 100 if match.questions > 0 else 0 %}
-                            <span class="{% if pct >= 83 %}text-emerald-400{% elif pct >= 50 %}text-yellow-400{% else %}text-red-400{% endif %} font-medium">
-                                {{ "%.0f"|format(pct) }}%
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
+                    <template x-for="match in sortedRows" :key="match.match_day">
+                        <tr class="hover:bg-slate-800">
+                            <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-100" x-text="'Day ' + match.match_day"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-gray-100" x-text="match.correct"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-slate-400" x-text="match.questions"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="font-medium"
+                                      :class="match.pct >= 83 ? 'text-emerald-400' : match.pct >= 50 ? 'text-yellow-400' : 'text-red-400'"
+                                      x-text="match.pct != null ? match.pct + '%' : '-'"></span>
+                            </td>
+                        </tr>
+                    </template>
                 </tbody>
             </table>
         </div>
