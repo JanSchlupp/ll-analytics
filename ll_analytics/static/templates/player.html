@@ -514,7 +514,7 @@
     <div x-show="activeTab === 'categories'" class="space-y-6">
         {% if season_category_stats %}
         <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden"
-             x-data="sortableTable({ rows: {{ season_category_stats | tojson }}, defaultSort: 'correct_pct', defaultDir: 'desc' })">
+             x-data="sortableTable({ rows: _seasonCatStats, defaultSort: 'correct_pct', defaultDir: 'desc' })">
             <div class="px-6 py-3 border-b border-slate-700">
                 <h3 class="text-lg font-medium text-gray-100">Season {{ season.season_number }} Performance</h3>
             </div>
@@ -549,7 +549,7 @@
 
         {% if lifetime_category_stats %}
         <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden"
-             x-data="sortableTable({ rows: {{ lifetime_category_stats | tojson }}, defaultSort: 'correct_pct', defaultDir: 'desc' })">
+             x-data="sortableTable({ rows: _lifetimeCatStats, defaultSort: 'correct_pct', defaultDir: 'desc' })">
             <div class="px-6 py-3 border-b border-slate-700">
                 <h3 class="text-lg font-medium text-gray-100">Lifetime Performance</h3>
             </div>
@@ -592,7 +592,7 @@
         {% if h2h_matches %}
         <!-- Head-to-head match results from matches table -->
         <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden"
-             x-data="sortableTable({ rows: {{ h2h_matches | tojson }}, defaultSort: 'match_day', defaultDir: 'asc' })">
+             x-data="sortableTable({ rows: _h2hMatches, defaultSort: 'match_day', defaultDir: 'asc' })">
             <table class="min-w-full divide-y divide-slate-700">
                 <thead class="bg-slate-800">
                     <tr>
@@ -625,7 +625,7 @@
         {% elif match_results %}
         <!-- Per-question results from answers table -->
         <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden"
-             x-data="sortableTable({ rows: {{ match_results | tojson }}, defaultSort: 'match_day', defaultDir: 'asc' })">
+             x-data="sortableTable({ rows: _matchResults, defaultSort: 'match_day', defaultDir: 'asc' })">
             <table class="min-w-full divide-y divide-slate-700">
                 <thead class="bg-slate-800">
                     <tr>
@@ -662,10 +662,16 @@
 
 {% block scripts %}
 <script>
+// Data for sortable tables (must be outside HTML attributes to avoid quote-breaking)
+const _seasonCatStats = {{ season_category_stats | tojson }};
+const _lifetimeCatStats = {{ lifetime_category_stats | tojson }};
+const _h2hMatches = {{ h2h_matches | tojson }};
+const _matchResults = {{ match_results | tojson }};
+
 document.addEventListener('DOMContentLoaded', function() {
     // Match day performance chart - use h2h_matches if available, else match_results
-    const h2hData = {{ h2h_matches | tojson }};
-    const matchData = {{ match_results | tojson }};
+    const h2hData = _h2hMatches;
+    const matchData = _matchResults;
 
     const ctx = document.getElementById('matchDayChart');
     if (!ctx) return;

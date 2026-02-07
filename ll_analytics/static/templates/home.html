@@ -3,74 +3,7 @@
 {% block title %}{{ current_rundle.name if current_rundle else "Home" }} - LL Analytics{% endblock %}
 
 {% block content %}
-<div x-data="{
-    selectedRundle: '{{ current_rundle.id if current_rundle else '' }}',
-    selectedMetric: '',
-    metricName: '',
-    metricsData: {},
-    loading: false,
-    rows: {{ standings | tojson }},
-    sortKey: 'final_rank',
-    sortDir: 'asc',
-    sort(key) {
-        if (this.sortKey === key) {
-            this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
-        } else {
-            this.sortKey = key;
-            this.sortDir = 'asc';
-        }
-    },
-    get sortedRows() {
-        if (!this.sortKey) return this.rows;
-        const key = this.sortKey;
-        const dir = this.sortDir;
-        if (key === '_metric') {
-            const md = this.metricsData;
-            return [...this.rows].sort((a, b) => {
-                const aVal = md[a.ll_username];
-                const bVal = md[b.ll_username];
-                if (aVal == null && bVal == null) return 0;
-                if (aVal == null) return 1;
-                if (bVal == null) return -1;
-                return dir === 'asc' ? aVal - bVal : bVal - aVal;
-            });
-        }
-        return sortArray(this.rows, key, dir);
-    },
-    sortIcon(key) {
-        if (this.sortKey !== key) return '';
-        return this.sortDir;
-    },
-    async loadMetric() {
-        if (!this.selectedMetric) {
-            this.metricsData = {};
-            this.metricName = '';
-            return;
-        }
-        this.loading = true;
-        try {
-            const response = await fetch(`/api/metrics/${this.selectedMetric}/rundle/{{ current_rundle.id if current_rundle else 0 }}`);
-            if (response.ok) {
-                const data = await response.json();
-                this.metricName = data.title || this.selectedMetric;
-                // Convert leaderboard array to username->value map
-                this.metricsData = {};
-                if (data.data && Array.isArray(data.data)) {
-                    data.data.forEach(item => {
-                        const username = item.username || item.player;
-                        const value = item.total_surprise ?? item.avg_luck_per_match ?? item.value ?? item.score;
-                        if (username && value !== undefined) {
-                            this.metricsData[username] = value;
-                        }
-                    });
-                }
-            }
-        } catch (e) {
-            console.error('Failed to load metric:', e);
-        }
-        this.loading = false;
-    }
-}">
+<div x-data="standingsTable()">
     <!-- Header -->
     <div class="mb-6">
         <h1 class="text-3xl font-bold text-gray-100">
@@ -260,6 +193,76 @@
 
 {% block scripts %}
 <script>
+function standingsTable() {
+    return {
+        selectedRundle: '{{ current_rundle.id if current_rundle else '' }}',
+        selectedMetric: '',
+        metricName: '',
+        metricsData: {},
+        loading: false,
+        rows: {{ standings | tojson }},
+        sortKey: 'final_rank',
+        sortDir: 'asc',
+        sort(key) {
+            if (this.sortKey === key) {
+                this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortKey = key;
+                this.sortDir = 'asc';
+            }
+        },
+        get sortedRows() {
+            if (!this.sortKey) return this.rows;
+            const key = this.sortKey;
+            const dir = this.sortDir;
+            if (key === '_metric') {
+                const md = this.metricsData;
+                return [...this.rows].sort((a, b) => {
+                    const aVal = md[a.ll_username];
+                    const bVal = md[b.ll_username];
+                    if (aVal == null && bVal == null) return 0;
+                    if (aVal == null) return 1;
+                    if (bVal == null) return -1;
+                    return dir === 'asc' ? aVal - bVal : bVal - aVal;
+                });
+            }
+            return sortArray(this.rows, key, dir);
+        },
+        sortIcon(key) {
+            if (this.sortKey !== key) return '';
+            return this.sortDir;
+        },
+        async loadMetric() {
+            if (!this.selectedMetric) {
+                this.metricsData = {};
+                this.metricName = '';
+                return;
+            }
+            this.loading = true;
+            try {
+                const response = await fetch(`/api/metrics/${this.selectedMetric}/rundle/{{ current_rundle.id if current_rundle else 0 }}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.metricName = data.title || this.selectedMetric;
+                    this.metricsData = {};
+                    if (data.data && Array.isArray(data.data)) {
+                        data.data.forEach(item => {
+                            const username = item.username || item.player;
+                            const value = item.total_surprise ?? item.avg_luck_per_match ?? item.value ?? item.score;
+                            if (username && value !== undefined) {
+                                this.metricsData[username] = value;
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load metric:', e);
+            }
+            this.loading = false;
+        }
+    };
+}
+
 function dashboardWidgets() {
     return {
         movers: [],
