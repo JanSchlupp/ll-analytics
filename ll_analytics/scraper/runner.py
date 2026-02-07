@@ -299,13 +299,24 @@ class LLScraper:
             for m in matches:
                 p1_id = player_map.get(m['player1'])
                 p2_id = player_map.get(m['player2'])
-                if not p1_id or not p2_id:
-                    continue
+                # Auto-create players we haven't seen before
+                if not p1_id:
+                    p1_id = get_or_create_player(conn, m['player1'])
+                    player_map[m['player1']] = p1_id
+                if not p2_id:
+                    p2_id = get_or_create_player(conn, m['player2'])
+                    player_map[m['player2']] = p2_id
                 try:
                     conn.execute("""
-                        INSERT OR REPLACE INTO matches
+                        INSERT INTO matches
                         (season_id, match_day, player1_id, player2_id, player1_score, player2_score, player1_tca, player2_tca, ll_match_id)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(season_id, match_day, player1_id, player2_id) DO UPDATE SET
+                            player1_score = excluded.player1_score,
+                            player2_score = excluded.player2_score,
+                            player1_tca = excluded.player1_tca,
+                            player2_tca = excluded.player2_tca,
+                            ll_match_id = excluded.ll_match_id
                     """, (season_id, m['match_day'], p1_id, p2_id, m['p1_score'], m['p2_score'], m['p1_tca'], m['p2_tca'], m.get('ll_match_id')))
                     saved += 1
                 except Exception as e:
@@ -657,9 +668,12 @@ class LLScraper:
             player2_id = get_or_create_player(conn, match["player2"])
 
             conn.execute("""
-                INSERT OR REPLACE INTO matches
+                INSERT INTO matches
                 (season_id, match_day, player1_id, player2_id, player1_score, player2_score)
                 VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(season_id, match_day, player1_id, player2_id) DO UPDATE SET
+                    player1_score = excluded.player1_score,
+                    player2_score = excluded.player2_score
             """, (
                 season_id,
                 match_day,
