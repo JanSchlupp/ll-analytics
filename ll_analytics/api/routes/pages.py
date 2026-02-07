@@ -115,9 +115,9 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
                 "SELECT * FROM seasons ORDER BY season_number DESC LIMIT 1"
             ).fetchone()
 
-        category_stats = []
+        season_category_stats = []
         if season_row:
-            category_stats = conn.execute("""
+            season_category_stats = conn.execute("""
                 SELECT c.name, pcs.correct_pct, pcs.total_questions
                 FROM player_category_stats pcs
                 JOIN categories c ON pcs.category_id = c.id
@@ -125,14 +125,16 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
                 ORDER BY pcs.correct_pct DESC
             """, (player["id"], season_row["id"])).fetchall()
 
-        if not category_stats:
-            category_stats = conn.execute("""
-                SELECT c.name, pls.correct_pct, pls.total_questions
-                FROM player_lifetime_stats pls
-                JOIN categories c ON pls.category_id = c.id
-                WHERE pls.player_id = ?
-                ORDER BY pls.correct_pct DESC
-            """, (player["id"],)).fetchall()
+        lifetime_category_stats = conn.execute("""
+            SELECT c.name, pls.correct_pct, pls.total_questions
+            FROM player_lifetime_stats pls
+            JOIN categories c ON pls.category_id = c.id
+            WHERE pls.player_id = ?
+            ORDER BY pls.correct_pct DESC
+        """, (player["id"],)).fetchall()
+
+        # For backward compat: category_stats = lifetime if available, else season
+        category_stats = lifetime_category_stats or season_category_stats
 
         match_results = []
         if season_row:
@@ -217,6 +219,8 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
             "player": dict(player),
             "season": dict(season_row) if season_row else None,
             "category_stats": [dict(c) for c in category_stats],
+            "season_category_stats": [dict(c) for c in season_category_stats],
+            "lifetime_category_stats": [dict(c) for c in lifetime_category_stats],
             "match_results": [dict(m) for m in match_results],
             "h2h_matches": [dict(m) for m in h2h_matches],
             "totals": dict(totals) if totals else {"total_q": 0, "tca": 0},

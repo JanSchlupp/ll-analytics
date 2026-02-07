@@ -94,12 +94,12 @@
             <canvas id="matchDayChart" height="200"></canvas>
         </div>
 
-        <!-- All Category Stats -->
-        {% if category_stats %}
+        <!-- Lifetime Category Stats -->
+        {% if lifetime_category_stats %}
         <div class="bg-slate-900 border border-slate-800 rounded-lg p-4">
             <h3 class="text-lg font-medium text-gray-100 mb-4">Category Performance (Lifetime)</h3>
             <div class="space-y-2 max-h-96 overflow-y-auto">
-                {% for cat in category_stats %}
+                {% for cat in lifetime_category_stats %}
                 <div class="flex items-center">
                     <span class="w-36 text-sm text-slate-400 truncate" title="{{ cat.name }}">{{ cat.name }}</span>
                     <div class="flex-1 mx-3">
@@ -511,9 +511,12 @@
     </div>
 
     <!-- Categories Tab -->
-    <div x-show="activeTab === 'categories'">
-        {% if category_stats %}
+    <div x-show="activeTab === 'categories'" class="space-y-6">
+        {% if season_category_stats %}
         <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+            <div class="px-6 py-3 border-b border-slate-700">
+                <h3 class="text-lg font-medium text-gray-100">Season {{ season.season_number }} Performance</h3>
+            </div>
             <table class="min-w-full divide-y divide-slate-700">
                 <thead class="bg-slate-800">
                     <tr>
@@ -524,7 +527,39 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800">
-                    {% for cat in category_stats %}
+                    {% for cat in season_category_stats %}
+                    <tr class="hover:bg-slate-800">
+                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-100">{{ cat.name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-100">{{ "%.1f"|format((cat.correct_pct or 0) * 100) }}%</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-slate-400">{{ cat.total_questions or '-' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="w-32 bg-slate-700 rounded-full h-2">
+                                <div class="{% if (cat.correct_pct or 0) >= 0.7 %}bg-emerald-500{% elif (cat.correct_pct or 0) >= 0.5 %}bg-yellow-500{% else %}bg-red-500{% endif %} h-2 rounded-full" style="width: {{ (cat.correct_pct or 0) * 100 }}%"></div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if lifetime_category_stats %}
+        <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+            <div class="px-6 py-3 border-b border-slate-700">
+                <h3 class="text-lg font-medium text-gray-100">Lifetime Performance</h3>
+            </div>
+            <table class="min-w-full divide-y divide-slate-700">
+                <thead class="bg-slate-800">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Correct %</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Questions</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Performance</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for cat in lifetime_category_stats %}
                     <tr class="hover:bg-slate-800">
                         <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-100">{{ cat.name }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-gray-100">{{ "%.1f"|format((cat.correct_pct or 0) * 100) }}%</td>
@@ -539,7 +574,9 @@
                 </tbody>
             </table>
         </div>
-        {% else %}
+        {% endif %}
+
+        {% if not season_category_stats and not lifetime_category_stats %}
         <p class="text-slate-500">No category data available.</p>
         {% endif %}
     </div>
