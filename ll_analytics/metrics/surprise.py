@@ -71,8 +71,10 @@ def calculate_expected_probability(
     1. Player's historical performance in this category
     2. Question difficulty (% of rundle who got it right)
 
-    The combination happens in log-odds space, which properly handles
-    probabilities and avoids the problems of simple averaging.
+    The combination averages the two signals in log-odds space.
+    We average rather than stack (add) because the signals are
+    correlated — stacking assumes independence and produces
+    overconfident predictions that bias surprise scores negative.
 
     Args:
         player_category_pct: Player's historical % in this category (0-1)
@@ -87,14 +89,14 @@ def calculate_expected_probability(
     question_difficulty = question_difficulty or baseline
 
     # Convert to log-odds and combine
-    # Each source contributes evidence relative to the baseline
     player_logit = _logit(player_category_pct)
     difficulty_logit = _logit(question_difficulty)
-    baseline_logit = _logit(baseline)
 
-    # Combined log-odds: each source adds evidence beyond baseline
-    # This is like a simplified logistic regression
-    combined_logit = player_logit + difficulty_logit - baseline_logit
+    # Average in log-odds space rather than stacking additively.
+    # Stacking assumes the two signals are independent, but they're
+    # correlated (category % already reflects question difficulty),
+    # which leads to overconfident predictions and systematic negative bias.
+    combined_logit = 0.5 * player_logit + 0.5 * difficulty_logit
 
     # Convert back to probability
     expected = _inv_logit(combined_logit)
