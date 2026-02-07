@@ -49,7 +49,7 @@
     <!-- Chart -->
     <div x-show="!loading" class="bg-slate-900 border border-slate-800 rounded-lg p-4 mb-6">
         <h3 class="text-lg font-medium text-gray-100 mb-4">Average Surprise by Match Day</h3>
-        <div class="h-96">
+        <div style="position: relative; width: 100%; height: 384px;">
             <canvas id="distributionChart"></canvas>
         </div>
     </div>
@@ -174,18 +174,10 @@ function surpriseDistribution() {
         },
 
         renderChart() {
-            console.log('[chart] renderChart called, distribution:', this.data.distribution?.length);
-            if (!this.data.distribution || this.data.distribution.length === 0) {
-                console.log('[chart] No distribution data, aborting');
-                return;
-            }
+            if (!this.data.distribution || this.data.distribution.length === 0) return;
 
             const ctx = document.getElementById('distributionChart');
-            console.log('[chart] canvas element:', ctx, 'dimensions:', ctx?.offsetWidth, 'x', ctx?.offsetHeight);
-            if (!ctx) {
-                console.log('[chart] Canvas not found, aborting');
-                return;
-            }
+            if (!ctx) return;
 
             if (this.chart) {
                 this.chart.destroy();
