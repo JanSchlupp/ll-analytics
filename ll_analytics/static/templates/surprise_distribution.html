@@ -174,10 +174,18 @@ function surpriseDistribution() {
         },
 
         renderChart() {
-            if (!this.data.distribution || this.data.distribution.length === 0) return;
+            console.log('[chart] renderChart called, distribution:', this.data.distribution?.length);
+            if (!this.data.distribution || this.data.distribution.length === 0) {
+                console.log('[chart] No distribution data, aborting');
+                return;
+            }
 
             const ctx = document.getElementById('distributionChart');
-            if (!ctx) return;
+            console.log('[chart] canvas element:', ctx, 'dimensions:', ctx?.offsetWidth, 'x', ctx?.offsetHeight);
+            if (!ctx) {
+                console.log('[chart] Canvas not found, aborting');
+                return;
+            }
 
             if (this.chart) {
                 this.chart.destroy();
