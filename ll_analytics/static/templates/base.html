@@ -41,6 +41,36 @@
                         <a href="/docs" class="px-3 py-2 rounded text-slate-300 hover:bg-slate-800 hover:text-gray-100">API Docs</a>
                     </div>
                 </div>
+                <!-- Season Selector -->
+                <div class="flex items-center mr-4" x-data="{
+                    seasons: [],
+                    current: '',
+                    async init() {
+                        try {
+                            const resp = await fetch('/api/seasons');
+                            const data = await resp.json();
+                            this.seasons = data.seasons.map(s => s.season_number);
+                            const params = new URLSearchParams(window.location.search);
+                            this.current = params.has('season')
+                                ? params.get('season')
+                                : (this.seasons.length ? String(this.seasons[0]) : '');
+                        } catch(e) { console.error('Failed to load seasons', e); }
+                    },
+                    change() {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('season', this.current);
+                        if (window.location.pathname === '/') url.searchParams.delete('rundle');
+                        window.location.href = url.toString();
+                    }
+                }" x-init="init()">
+                    <select x-model="current" @change="change()"
+                            class="px-2 py-1 bg-slate-800 border border-slate-600 text-gray-100 rounded text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                        <template x-for="s in seasons" :key="s">
+                            <option :value="String(s)" x-text="'S' + s"></option>
+                        </template>
+                    </select>
+                </div>
+
                 <!-- Player Search -->
                 <div class="flex items-center" x-data="playerSearch()">
                     <div class="relative">

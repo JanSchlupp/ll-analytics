@@ -20,15 +20,24 @@ router = APIRouter()
 
 
 @router.get("/", response_class=HTMLResponse)
-async def home(request: Request, rundle: Optional[int] = Query(None)):
+async def home(request: Request, rundle: Optional[int] = Query(None), season: Optional[int] = Query(None)):
     """Homepage - Rundle standings."""
     if not templates:
         return RedirectResponse("/docs")
 
     with get_connection() as conn:
-        season = conn.execute(
-            "SELECT * FROM seasons ORDER BY season_number DESC LIMIT 1"
-        ).fetchone()
+        if season:
+            season_row = conn.execute(
+                "SELECT * FROM seasons WHERE season_number = ?", (season,)
+            ).fetchone()
+            # Fall back to latest if the requested season doesn't exist
+            season = season_row or conn.execute(
+                "SELECT * FROM seasons ORDER BY season_number DESC LIMIT 1"
+            ).fetchone()
+        else:
+            season = conn.execute(
+                "SELECT * FROM seasons ORDER BY season_number DESC LIMIT 1"
+            ).fetchone()
 
         if not season:
             return templates.TemplateResponse("home.html", {

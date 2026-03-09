@@ -36,8 +36,8 @@ class Config:
     REQUEST_TIMEOUT: int = 30  # Seconds
 
     # Game defaults
-    DEFAULT_SEASON: int = int(os.getenv("DEFAULT_SEASON", "107"))
-    DEFAULT_RUNDLE: str = os.getenv("DEFAULT_RUNDLE", "C_Skyline")
+    DEFAULT_SEASON: int = int(os.getenv("DEFAULT_SEASON", "108"))
+    DEFAULT_RUNDLE: str = os.getenv("DEFAULT_RUNDLE", "B_Skyline")
 
     # Metric tunables
     LEVERAGE_START_DAY: int = 12  # Surprise distribution: leverage split after this day

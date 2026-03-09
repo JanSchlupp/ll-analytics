@@ -10,6 +10,7 @@ from ..database import init_db
 
 setup_logging(Config.LOG_LEVEL, Config.LOG_FILE)
 from .routes import players, seasons, metrics, surprise_routes, luck_routes, pages, heatmap_routes
+from ..scheduler import start_scheduler, stop_scheduler, trigger_scrape_now
 
 logger = get_logger(__name__)
 
@@ -40,14 +41,33 @@ app.include_router(pages.router, tags=["Pages"])
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database on startup."""
+    """Initialize database and start daily scrape scheduler."""
     init_db()
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop the scheduler gracefully."""
+    stop_scheduler()
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Render."""
     return {"status": "healthy"}
+
+
+@app.post("/api/scrape/trigger", tags=["Admin"])
+async def trigger_scrape():
+    """
+    Manually trigger an immediate data scrape in the background.
+
+    Useful after a match day to pull in results without waiting for
+    the scheduled noon run.  Returns immediately; scrape runs in a
+    background thread.
+    """
+    return trigger_scrape_now()
 
 
 def run_server():

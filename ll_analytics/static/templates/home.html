@@ -79,7 +79,7 @@
             <label class="block text-sm font-medium text-slate-400 mb-1">Rundle</label>
             <select
                 x-model="selectedRundle"
-                @change="window.location.href = '/?rundle=' + selectedRundle"
+                @change="changeRundle()"
                 class="w-full px-4 py-2 bg-slate-800 border border-slate-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
                 {% for rundle in rundles %}
@@ -203,6 +203,11 @@ function standingsTable() {
         rows: {{ standings | tojson }},
         sortKey: 'final_rank',
         sortDir: 'asc',
+        changeRundle() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('rundle', this.selectedRundle);
+            window.location.href = url.toString();
+        },
         sort(key) {
             if (this.sortKey === key) {
                 this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
