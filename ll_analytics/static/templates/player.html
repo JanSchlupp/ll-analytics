@@ -153,25 +153,30 @@
                 <!-- Metric Value -->
                 <div class="flex items-center gap-4">
                     {% if metric.result and metric.result.data %}
-                        {% if metric.result.data.get('total_surprise') is not none %}
-                        <span class="text-xl font-bold {% if metric.result.data.get('total_surprise', 0) > 0 %}text-emerald-400{% elif metric.result.data.get('total_surprise', 0) < 0 %}text-red-400{% else %}text-slate-400{% endif %}">
-                            {{ "%+.2f"|format(metric.result.data.get('total_surprise', 0)) }}
+                        {% set ts = metric.result.data.get('total_surprise') %}
+                        {% set zs = metric.result.data.get('z_score') or 0 %}
+                        {% set tl = metric.result.data.get('total_luck') %}
+                        {% set roi = metric.result.data.get('roi') %}
+                        {% set bs = metric.result.data.get('breadth_score') %}
+                        {% if ts is not none %}
+                        <span class="text-xl font-bold {% if (ts or 0) > 0 %}text-emerald-400{% elif (ts or 0) < 0 %}text-red-400{% else %}text-slate-400{% endif %}">
+                            {{ "%+.2f"|format(ts or 0) }}
                         </span>
                         {% elif metric.result.data.get('early') is not none %}
-                        <span class="text-xl font-bold {% if metric.result.data.get('z_score', 0) > 1.5 %}text-orange-400{% elif metric.result.data.get('z_score', 0) < -1.5 %}text-blue-400{% else %}text-slate-400{% endif %}">
-                            {% if metric.result.data.get('z_score', 0) > 0 %}+{% endif %}{{ "%.2f"|format(metric.result.data.get('z_score', 0)) }} z
+                        <span class="text-xl font-bold {% if zs > 1.5 %}text-orange-400{% elif zs < -1.5 %}text-blue-400{% else %}text-slate-400{% endif %}">
+                            {% if zs > 0 %}+{% endif %}{{ "%.2f"|format(zs) }} z
                         </span>
-                        {% elif metric.result.data.get('total_luck') is not none %}
-                        <span class="text-xl font-bold {% if metric.result.data.get('total_luck', 0) > 0 %}text-emerald-400{% elif metric.result.data.get('total_luck', 0) < 0 %}text-red-400{% else %}text-slate-400{% endif %}">
-                            {{ "%+.1f"|format(metric.result.data.get('total_luck', 0)) }}
+                        {% elif tl is not none %}
+                        <span class="text-xl font-bold {% if (tl or 0) > 0 %}text-emerald-400{% elif (tl or 0) < 0 %}text-red-400{% else %}text-slate-400{% endif %}">
+                            {{ "%+.1f"|format(tl or 0) }}
                         </span>
-                        {% elif metric.result.data.get('roi') is not none %}
-                        <span class="text-xl font-bold {% if metric.result.data.get('roi', 0) > 0 %}text-emerald-400{% elif metric.result.data.get('roi', 0) < 0 %}text-red-400{% else %}text-slate-400{% endif %}">
-                            {{ "%+d"|format(metric.result.data.get('roi', 0)) }} pts
+                        {% elif roi is not none %}
+                        <span class="text-xl font-bold {% if (roi or 0) > 0 %}text-emerald-400{% elif (roi or 0) < 0 %}text-red-400{% else %}text-slate-400{% endif %}">
+                            {{ "%+d"|format(roi or 0) }} pts
                         </span>
-                        {% elif metric.result.data.get('breadth_score') is not none %}
-                        <span class="text-xl font-bold {% if metric.result.data.get('breadth_score', 0) >= 0.7 %}text-emerald-400{% elif metric.result.data.get('breadth_score', 0) >= 0.4 %}text-yellow-400{% else %}text-red-400{% endif %}">
-                            {{ "%.2f"|format(metric.result.data.get('breadth_score', 0)) }}
+                        {% elif bs is not none %}
+                        <span class="text-xl font-bold {% if (bs or 0) >= 0.7 %}text-emerald-400{% elif (bs or 0) >= 0.4 %}text-yellow-400{% else %}text-red-400{% endif %}">
+                            {{ "%.2f"|format(bs or 0) }}
                         </span>
                         {% endif %}
                     {% endif %}
