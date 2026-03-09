@@ -4,15 +4,9 @@ services:
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn ll_analytics.api.main:app --host 0.0.0.0 --port $PORT
-    disk:
-      name: ll-analytics-data
-      mountPath: /data
-      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
-      - key: DATABASE_PATH
-        value: /data/ll_analytics.db
       - key: DEFAULT_SEASON
         value: "108"
       - key: DEFAULT_RUNDLE
