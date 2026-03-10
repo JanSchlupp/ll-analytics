@@ -148,6 +148,9 @@ class LLScraper:
         if include_rundle_answers:
             self._scrape_rundle_answers(season_number, rundle, rundle_id, result)
 
+        # Compute rundle_correct_pct from saved answers (so surprise metric has real difficulty data)
+        self._update_rundle_correct_pct(season_number, result)
+
         result.finish()
 
         logger.info("=" * 50)
@@ -544,6 +547,33 @@ class LLScraper:
                 time.sleep(1.0)
 
         result.count("rundle_answers", total_answers)
+
+    # ── Post-processing: rundle correct pct ────────────────────────
+
+    def _update_rundle_correct_pct(self, season: int, result: ScrapeResult) -> None:
+        """Compute rundle_correct_pct for each question from saved answers."""
+        with get_connection() as conn:
+            season_row = conn.execute(
+                "SELECT id FROM seasons WHERE season_number = ?", (season,)
+            ).fetchone()
+            if not season_row:
+                return
+            season_id = season_row["id"]
+
+            updated = conn.execute("""
+                UPDATE questions
+                SET rundle_correct_pct = (
+                    SELECT AVG(CAST(a.correct AS FLOAT))
+                    FROM answers a
+                    WHERE a.question_id = questions.id
+                )
+                WHERE season_id = ?
+                AND EXISTS (SELECT 1 FROM answers a WHERE a.question_id = questions.id)
+            """, (season_id,)).rowcount
+            conn.commit()
+
+        logger.info("  Updated rundle_correct_pct for %d questions", updated)
+        result.count("rundle_correct_pct_updated", updated)
 
     # ── Simpler scrape_season (original runner interface) ──────────
 

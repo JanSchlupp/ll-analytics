@@ -193,7 +193,7 @@ class SurpriseMetric(BaseMetric):
                 q.correct_answer,
                 q.rundle_correct_pct,
                 c.name as category,
-                COALESCE(pcs.correct_pct, pls.correct_pct) as player_category_pct
+                COALESCE(pcs.correct_pct, pls.correct_pct, pls_overall.overall_pct) as player_category_pct
             FROM answers a
             JOIN questions q ON a.question_id = q.id
             JOIN categories c ON q.category_id = c.id
@@ -206,6 +206,11 @@ class SurpriseMetric(BaseMetric):
                 pls.player_id = a.player_id
                 AND pls.category_id = q.category_id
             )
+            LEFT JOIN (
+                SELECT player_id, AVG(correct_pct) as overall_pct
+                FROM player_lifetime_stats
+                GROUP BY player_id
+            ) pls_overall ON pls_overall.player_id = a.player_id
             WHERE a.player_id = ? AND q.season_id = ?
             ORDER BY q.match_day, q.question_number
         """, (player["id"], season_id)).fetchall()
@@ -309,7 +314,7 @@ class SurpriseMetric(BaseMetric):
                     a.correct,
                     q.match_day,
                     q.rundle_correct_pct,
-                    COALESCE(pcs.correct_pct, pls.correct_pct) as player_category_pct
+                    COALESCE(pcs.correct_pct, pls.correct_pct, pls_overall.overall_pct) as player_category_pct
                 FROM answers a
                 JOIN questions q ON a.question_id = q.id
                 LEFT JOIN player_category_stats pcs ON (
@@ -321,6 +326,11 @@ class SurpriseMetric(BaseMetric):
                     pls.player_id = a.player_id
                     AND pls.category_id = q.category_id
                 )
+                LEFT JOIN (
+                    SELECT player_id, AVG(correct_pct) as overall_pct
+                    FROM player_lifetime_stats
+                    GROUP BY player_id
+                ) pls_overall ON pls_overall.player_id = a.player_id
                 WHERE a.player_id = ? AND q.season_id = ?
                 ORDER BY q.match_day
             """, (player_id, season_id)).fetchall()
@@ -417,7 +427,7 @@ class SurpriseMetric(BaseMetric):
                 q.correct_answer,
                 q.rundle_correct_pct,
                 c.name as category,
-                pcs.correct_pct as player_category_pct
+                COALESCE(pcs.correct_pct, pls.correct_pct, pls_overall.overall_pct) as player_category_pct
             FROM answers a
             JOIN questions q ON a.question_id = q.id
             JOIN categories c ON q.category_id = c.id
@@ -426,6 +436,15 @@ class SurpriseMetric(BaseMetric):
                 AND pcs.category_id = q.category_id
                 AND pcs.season_id = q.season_id
             )
+            LEFT JOIN player_lifetime_stats pls ON (
+                pls.player_id = a.player_id
+                AND pls.category_id = q.category_id
+            )
+            LEFT JOIN (
+                SELECT player_id, AVG(correct_pct) as overall_pct
+                FROM player_lifetime_stats
+                GROUP BY player_id
+            ) pls_overall ON pls_overall.player_id = a.player_id
             WHERE a.player_id = ?
         """
         params = [player_id]
