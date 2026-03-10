@@ -394,38 +394,75 @@ def scrape_match_results(
             soup = BeautifulSoup(html, 'lxml')
             day_matches = []
 
-            for table in soup.find_all('table'):
-                rows = table.find_all('tr')
+            # Each match is wrapped in a div.gl-wrap (new LL layout).
+            # Fallback: look for rows with exactly 2 profiles.php links.
+            gl_wraps = soup.find_all('div', class_='gl-wrap')
+            if gl_wraps:
+                for wrap in gl_wraps:
+                    p1_div = wrap.find('div', class_='gl-p1')
+                    p2_div = wrap.find('div', class_='gl-p2')
+                    score_div = wrap.find('div', class_='gl-score')
+                    if not (p1_div and p2_div and score_div):
+                        continue
 
-                for row in rows:
-                    links = row.find_all('a', href=lambda h: h and 'profiles.php' in h)
+                    p1_img = p1_div.find('img')
+                    p2_img = p2_div.find('img')
+                    p1_name = p1_img.get('alt', '').strip() if p1_img else p1_div.get_text(strip=True)
+                    p2_name = p2_img.get('alt', '').strip() if p2_img else p2_div.get_text(strip=True)
 
-                    if len(links) == 2:
+                    score_link = score_div.find('a', href=re.compile(r'match\.php\?id='))
+                    ll_match_id = None
+                    if score_link:
+                        id_m = re.search(r'id=(\d+)', score_link.get('href', ''))
+                        if id_m:
+                            ll_match_id = int(id_m.group(1))
+                        score_text = score_link.get_text(strip=True).replace('\xa0', ' ')
+                    else:
+                        score_text = score_div.get_text(strip=True).replace('\xa0', ' ')
+
+                    score_m = re.search(r'(\d+)\((\d+)\)\s*(\d+)\((\d+)\)', score_text)
+                    if score_m:
+                        day_matches.append({
+                            'match_day': day,
+                            'player1': p1_name,
+                            'player2': p2_name,
+                            'p1_score': int(score_m.group(1)),
+                            'p1_tca': int(score_m.group(2)),
+                            'p2_score': int(score_m.group(3)),
+                            'p2_tca': int(score_m.group(4)),
+                            'll_match_id': ll_match_id,
+                        })
+            else:
+                # Fallback: row-based parsing for older layout
+                for table in soup.find_all('table'):
+                    for row in table.find_all('tr'):
+                        links = row.find_all('a', href=lambda h: h and 'profiles.php' in h)
+                        if len(links) != 2:
+                            continue
                         p1_img = links[0].find('img')
                         p2_img = links[1].find('img')
                         p1_name = p1_img.get('alt', '') if p1_img else links[0].get_text(strip=True)
                         p2_name = p2_img.get('alt', '') if p2_img else links[1].get_text(strip=True)
-
                         ll_match_id = None
                         match_link = row.find('a', href=lambda h: h and 'match.php?id=' in h)
                         if match_link:
-                            id_match = re.search(r'id=(\d+)', match_link.get('href', ''))
-                            if id_match:
-                                ll_match_id = int(id_match.group(1))
-
-                        cells = row.find_all(['td', 'th'])
-                        for cell in cells:
-                            text = cell.get_text(strip=True)
-                            match = re.match(r'(\d+)\((\d+)\)\s*(\d+)\((\d+)\)', text.replace('\xa0', ' '))
-                            if match:
+                            id_m = re.search(r'id=(\d+)', match_link.get('href', ''))
+                            if id_m:
+                                ll_match_id = int(id_m.group(1))
+                        for cell in row.find_all(['td', 'th']):
+                            score_m = re.search(
+                                r'(\d+)\((\d+)\)\s*(\d+)\((\d+)\)',
+                                cell.get_text(strip=True).replace('\xa0', ' ')
+                            )
+                            if score_m:
                                 day_matches.append({
                                     'match_day': day,
                                     'player1': p1_name,
                                     'player2': p2_name,
-                                    'p1_score': int(match.group(1)),
-                                    'p1_tca': int(match.group(2)),
-                                    'p2_score': int(match.group(3)),
-                                    'p2_tca': int(match.group(4)),
+                                    'p1_score': int(score_m.group(1)),
+                                    'p1_tca': int(score_m.group(2)),
+                                    'p2_score': int(score_m.group(3)),
+                                    'p2_tca': int(score_m.group(4)),
                                     'll_match_id': ll_match_id,
                                 })
                                 break

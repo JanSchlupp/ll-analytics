@@ -481,7 +481,16 @@ class LLScraper:
                 if not data:
                     continue
 
-                # Update questions
+                # Ensure all 6 question rows exist for this day before saving answers.
+                # Use the Miscellaneous category as a placeholder (updated below when known).
+                misc_cat_id = categories.get('Miscellaneous', 18)
+                for q_num in range(1, 7):
+                    conn.execute(
+                        "INSERT OR IGNORE INTO questions (season_id, match_day, question_number, category_id) VALUES (?, ?, ?, ?)",
+                        (season_id, day, q_num, misc_cat_id),
+                    )
+
+                # Update questions with text/category where available
                 for q in data.get('questions', []):
                     cat_abbrev = q.get('category', '').strip()
                     cat_name = CATEGORY_MAP.get(cat_abbrev, cat_abbrev)
