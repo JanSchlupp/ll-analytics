@@ -294,11 +294,16 @@ class LLScraper:
                 p['ll_username']: p['id']
                 for p in conn.execute("SELECT id, ll_username FROM players").fetchall()
             }
+            ll_id_map = {
+                p['ll_id']: p['id']
+                for p in conn.execute("SELECT id, ll_id FROM players WHERE ll_id IS NOT NULL").fetchall()
+            }
 
             saved = 0
             for m in matches:
-                p1_id = player_map.get(m['player1'])
-                p2_id = player_map.get(m['player2'])
+                # Prefer ll_id lookup (immune to name truncation / apostrophe issues)
+                p1_id = ll_id_map.get(m.get('p1_ll_id')) or player_map.get(m['player1'])
+                p2_id = ll_id_map.get(m.get('p2_ll_id')) or player_map.get(m['player2'])
                 # Auto-create players we haven't seen before
                 if not p1_id:
                     p1_id = get_or_create_player(conn, m['player1'])

@@ -405,6 +405,17 @@ def scrape_match_results(
                     if not (p1_div and p2_div and score_div):
                         continue
 
+                    # Extract LL IDs from profiles.php links — more reliable than
+                    # img alt, which breaks when usernames contain apostrophes
+                    # (lxml truncates single-quoted attributes at the apostrophe).
+                    p1_link = p1_div.find('a', href=re.compile(r'profiles\.php\?'))
+                    p2_link = p2_div.find('a', href=re.compile(r'profiles\.php\?'))
+                    p1_ll_id_m = re.search(r'profiles\.php\?(\d+)', p1_link.get('href', '')) if p1_link else None
+                    p2_ll_id_m = re.search(r'profiles\.php\?(\d+)', p2_link.get('href', '')) if p2_link else None
+                    p1_ll_id = int(p1_ll_id_m.group(1)) if p1_ll_id_m else None
+                    p2_ll_id = int(p2_ll_id_m.group(1)) if p2_ll_id_m else None
+
+                    # Fall back to img alt / div text only if we couldn't get an ll_id
                     p1_img = p1_div.find('img')
                     p2_img = p2_div.find('img')
                     p1_name = p1_img.get('alt', '').strip() if p1_img else p1_div.get_text(strip=True)
@@ -426,6 +437,8 @@ def scrape_match_results(
                             'match_day': day,
                             'player1': p1_name,
                             'player2': p2_name,
+                            'p1_ll_id': p1_ll_id,
+                            'p2_ll_id': p2_ll_id,
                             'p1_score': int(score_m.group(1)),
                             'p1_tca': int(score_m.group(2)),
                             'p2_score': int(score_m.group(3)),
