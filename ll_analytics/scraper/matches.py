@@ -193,13 +193,11 @@ def parse_match_detail_page(html: str) -> dict | None:
         if len(cells) < 4:
             continue
 
-        category = cells[0].get_text(strip=True) if len(cells) > 0 else None
-        ca_pct_text = cells[1].get_text(strip=True) if len(cells) > 1 else None
+        # cells[1] contains "CATEGORY · question text answer"
+        cat_text = cells[1].get_text(separator=' ', strip=True) if len(cells) > 1 else ''
+        cat_parts = re.split(r'\s*\u2014\s*', cat_text, maxsplit=1)
+        category = cat_parts[0].strip() if cat_parts else None
         ca_pct = None
-        if ca_pct_text:
-            ca_match = re.search(r'(\d+)%', ca_pct_text)
-            if ca_match:
-                ca_pct = int(ca_match.group(1)) / 100.0
 
         p1_cell = cells[2]
         p2_cell = cells[3]

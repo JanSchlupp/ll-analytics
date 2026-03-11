@@ -141,6 +141,7 @@ class LLScraper:
 
         if include_match_details:
             self._scrape_match_details(season_number, result)
+            self._update_question_categories(season_number, result)
 
         if include_profiles:
             self._scrape_profiles(rundle_id, result)
@@ -150,6 +151,9 @@ class LLScraper:
 
         # Compute rundle_correct_pct from saved answers (so surprise metric has real difficulty data)
         self._update_rundle_correct_pct(season_number, result)
+
+        # Compute per-player per-category rates from current season answers
+        self._update_player_category_stats(season_number, result)
 
         result.finish()
 
@@ -370,7 +374,12 @@ class LLScraper:
                 details = scrape_match_details(self.session, row['ll_match_id'])
                 if details and details['questions']:
                     for q in details['questions']:
-                        category_id = categories.get(q.get('category')) if q.get('category') else None
+                        raw_cat = q.get('category')
+                        if raw_cat:
+                            cat_name = CATEGORY_MAP.get(raw_cat, raw_cat)
+                            category_id = categories.get(cat_name)
+                        else:
+                            category_id = None
                         conn.execute("""
                             INSERT OR REPLACE INTO match_questions
                             (match_id, question_num, player1_correct, player2_correct, player1_defense, player2_defense, category_id, question_ca_pct)
@@ -574,6 +583,91 @@ class LLScraper:
 
         logger.info("  Updated rundle_correct_pct for %d questions", updated)
         result.count("rundle_correct_pct_updated", updated)
+
+    # ── Post-processing: propagate categories from match_questions ──
+
+    def _update_question_categories(self, season: int, result: ScrapeResult) -> None:
+        """Propagate category_id from match_questions → questions for real categories."""
+        with get_connection() as conn:
+            season_row = conn.execute(
+                "SELECT id FROM seasons WHERE season_number = ?", (season,)
+            ).fetchone()
+            if not season_row:
+                return
+            season_id = season_row["id"]
+
+            misc_cat_id = conn.execute(
+                "SELECT id FROM categories WHERE name = 'Miscellaneous'"
+            ).fetchone()
+            misc_id = misc_cat_id["id"] if misc_cat_id else 18
+
+            updated = conn.execute("""
+                UPDATE questions SET category_id = (
+                    SELECT mq.category_id
+                    FROM match_questions mq
+                    JOIN matches m ON mq.match_id = m.id
+                    WHERE m.season_id = questions.season_id
+                      AND m.match_day = questions.match_day
+                      AND mq.question_num = questions.question_number
+                      AND mq.category_id IS NOT NULL
+                      AND mq.category_id != ?
+                    LIMIT 1
+                )
+                WHERE season_id = ?
+                  AND (category_id IS NULL OR category_id = ?)
+                  AND EXISTS (
+                      SELECT 1 FROM match_questions mq
+                      JOIN matches m ON mq.match_id = m.id
+                      WHERE m.season_id = questions.season_id
+                        AND m.match_day = questions.match_day
+                        AND mq.question_num = questions.question_number
+                        AND mq.category_id IS NOT NULL
+                        AND mq.category_id != ?
+                  )
+            """, (misc_id, season_id, misc_id, misc_id)).rowcount
+            conn.commit()
+
+        logger.info("  Propagated categories to %d questions from match_questions", updated)
+        result.count("questions_category_updated", updated)
+
+    # ── Post-processing: player category stats ──────────────────────
+
+    def _update_player_category_stats(self, season: int, result: ScrapeResult) -> None:
+        """Compute per-player per-category correct rates from current season answers."""
+        with get_connection() as conn:
+            season_row = conn.execute(
+                "SELECT id FROM seasons WHERE season_number = ?", (season,)
+            ).fetchone()
+            if not season_row:
+                return
+            season_id = season_row["id"]
+
+            misc_cat_id = conn.execute(
+                "SELECT id FROM categories WHERE name = 'Miscellaneous'"
+            ).fetchone()
+            misc_id = misc_cat_id["id"] if misc_cat_id else 18
+
+            rows = conn.execute("""
+                SELECT a.player_id, q.category_id, q.season_id,
+                       AVG(CAST(a.correct AS FLOAT)) as correct_pct,
+                       COUNT(*) as total_questions
+                FROM answers a
+                JOIN questions q ON a.question_id = q.id
+                WHERE q.season_id = ? AND q.category_id != ?
+                GROUP BY a.player_id, q.category_id, q.season_id
+            """, (season_id, misc_id)).fetchall()
+
+            for row in rows:
+                conn.execute("""
+                    INSERT OR REPLACE INTO player_category_stats
+                    (player_id, category_id, season_id, correct_pct, total_questions)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (row['player_id'], row['category_id'], row['season_id'],
+                      row['correct_pct'], row['total_questions']))
+            conn.commit()
+
+        logger.info("  Computed player_category_stats: %d rows", len(rows))
+        result.count("player_category_stats", len(rows))
 
     # ── Simpler scrape_season (original runner interface) ──────────
 
