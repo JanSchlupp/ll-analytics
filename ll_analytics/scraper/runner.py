@@ -133,6 +133,9 @@ class LLScraper:
         if include_standings:
             self._scrape_standings(season_number, rundle, rundle_id, result)
 
+        # Scrape tracker and auto-scrape tracked players' rundles
+        self._scrape_tracker(season_number, result)
+
         if include_my_answers:
             self._scrape_my_answers(season_number, result)
 
@@ -229,6 +232,74 @@ class LLScraper:
             conn.commit()
 
         result.count("players_standings", len(players_stats))
+
+    # ── Tracker: scrape watched players' rundles ────────────────────
+
+    def _scrape_tracker(self, season: int, result: ScrapeResult) -> None:
+        """Scrape LL player tracker and save tracked players + their rundle data."""
+        logger.info("[tracker] Scraping player tracker...")
+        tracked = scrape_tracker(self.session, season)
+        if not tracked:
+            logger.info("  No tracked players found")
+            return
+        logger.info("  Found %d tracked players", len(tracked))
+
+        with get_connection() as conn:
+            season_row = conn.execute(
+                "SELECT id FROM seasons WHERE season_number = ?", (season,)
+            ).fetchone()
+            if not season_row:
+                return
+            season_id = season_row["id"]
+
+            for t in tracked:
+                # Ensure player exists
+                player_id = get_or_create_player(conn, t['username'])
+                if t.get('ll_id'):
+                    conn.execute(
+                        "UPDATE players SET ll_id = ? WHERE id = ? AND ll_id IS NULL",
+                        (t['ll_id'], player_id),
+                    )
+
+                # Ensure rundle exists
+                rundle_name = t['rundle']
+                level = rundle_name.split('_')[0] if '_' in rundle_name else rundle_name[0]
+                conn.execute(
+                    "INSERT OR IGNORE INTO rundles (season_id, league, level, name) VALUES (?, ?, ?, ?)",
+                    (season_id, 'LL', level, rundle_name),
+                )
+                rundle_row = conn.execute(
+                    "SELECT id FROM rundles WHERE season_id = ? AND name = ?",
+                    (season_id, rundle_name),
+                ).fetchone()
+                rundle_id = rundle_row["id"] if rundle_row else None
+
+                conn.execute("""
+                    INSERT OR REPLACE INTO tracked_players (player_id, season_id, rundle_id)
+                    VALUES (?, ?, ?)
+                """, (player_id, season_id, rundle_id))
+
+            conn.commit()
+
+        result.count("tracked_players", len(tracked))
+
+        # Scrape standings for each unique tracked rundle
+        unique_rundles = {t['rundle'] for t in tracked}
+        for rundle_name in unique_rundles:
+            logger.info("  Scraping tracked rundle: %s", rundle_name)
+            try:
+                with get_connection() as conn:
+                    rundle_row = conn.execute(
+                        "SELECT id FROM rundles WHERE season_id = ? AND name = ?",
+                        (season_id, rundle_name),
+                    ).fetchone()
+                    if not rundle_row:
+                        continue
+                    rundle_id = rundle_row["id"]
+                self._scrape_standings(season, rundle_name, rundle_id, result)
+                self._scrape_rundle_answers(season, rundle_name, rundle_id, result)
+            except Exception as e:
+                result.error("tracked_rundle", f"{rundle_name}: {e}")
 
     # ── Part 2: My answers ─────────────────────────────────────────
 

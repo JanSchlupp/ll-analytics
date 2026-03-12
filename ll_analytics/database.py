@@ -132,6 +132,14 @@ CREATE TABLE IF NOT EXISTS metric_cache (
     PRIMARY KEY (metric_id, cache_key)
 );
 
+-- Tracked players (from LL player tracker)
+CREATE TABLE IF NOT EXISTS tracked_players (
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    season_id INTEGER NOT NULL REFERENCES seasons(id),
+    rundle_id INTEGER REFERENCES rundles(id),
+    PRIMARY KEY (player_id, season_id)
+);
+
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_answers_player ON answers(player_id);
 CREATE INDEX IF NOT EXISTS idx_answers_question ON answers(question_id);
@@ -140,6 +148,7 @@ CREATE INDEX IF NOT EXISTS idx_player_category_stats_player ON player_category_s
 CREATE INDEX IF NOT EXISTS idx_player_lifetime_stats_player ON player_lifetime_stats(player_id);
 CREATE INDEX IF NOT EXISTS idx_matches_season_day ON matches(season_id, match_day);
 CREATE INDEX IF NOT EXISTS idx_match_questions_match ON match_questions(match_id);
+CREATE INDEX IF NOT EXISTS idx_tracked_players_season ON tracked_players(season_id);
 """
 
 

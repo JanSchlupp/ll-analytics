@@ -400,3 +400,64 @@ async def compare_page(request: Request, season: Optional[int] = Query(None)):
         "seasons": [s["season_number"] for s in seasons_list],
         "default_season": default_season,
     })
+
+
+@router.get("/watchlist", response_class=HTMLResponse)
+async def watchlist_page(request: Request, season: Optional[int] = Query(None)):
+    """Watchlist page showing tracked players and their rundle performance."""
+    if not templates:
+        return RedirectResponse("/docs")
+
+    with get_connection() as conn:
+        if season:
+            season_row = conn.execute(
+                "SELECT * FROM seasons WHERE season_number = ?", (season,)
+            ).fetchone()
+        else:
+            season_row = conn.execute(
+                "SELECT * FROM seasons ORDER BY season_number DESC LIMIT 1"
+            ).fetchone()
+
+        if not season_row:
+            return templates.TemplateResponse("watchlist.html", {
+                "request": request,
+                "season": None,
+                "tracked": [],
+            })
+
+        season_id = season_row["id"]
+
+        tracked_rows = conn.execute("""
+            SELECT
+                p.ll_username,
+                r.name as rundle,
+                pr.final_rank,
+                COALESCE(
+                    (SELECT SUM(CASE WHEN m.player1_id = p.id THEN m.player1_tca ELSE m.player2_tca END)
+                     FROM matches m WHERE m.season_id = :sid AND (m.player1_id = p.id OR m.player2_id = p.id)),
+                    0
+                ) as tca,
+                COALESCE(
+                    (SELECT COUNT(*) * 6
+                     FROM matches m WHERE m.season_id = :sid AND (m.player1_id = p.id OR m.player2_id = p.id)),
+                    0
+                ) as total_q
+            FROM tracked_players tp
+            JOIN players p ON tp.player_id = p.id
+            JOIN rundles r ON tp.rundle_id = r.id
+            LEFT JOIN player_rundles pr ON pr.player_id = p.id AND pr.rundle_id = tp.rundle_id
+            WHERE tp.season_id = :sid
+            ORDER BY r.name, pr.final_rank
+        """, {"sid": season_id}).fetchall()
+
+        tracked = []
+        for t in tracked_rows:
+            d = dict(t)
+            d["ca_pct"] = round(d["tca"] / d["total_q"] * 100, 1) if d.get("total_q") else None
+            tracked.append(d)
+
+    return templates.TemplateResponse("watchlist.html", {
+        "request": request,
+        "season": dict(season_row),
+        "tracked": tracked,
+    })

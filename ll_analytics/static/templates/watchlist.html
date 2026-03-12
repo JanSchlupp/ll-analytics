@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Watchlist - LL Analytics{% endblock %}
+
+{% block content %}
+<div>
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-100">Watchlist</h1>
+        {% if season %}
+        <p class="text-slate-400 mt-1">Season {{ season.season_number }} — tracked players</p>
+        {% endif %}
+    </div>
+
+    {% if not season or not tracked %}
+    <div class="bg-slate-900 border border-yellow-600/30 rounded-lg p-4">
+        <p class="text-yellow-400">
+            {% if not season %}
+                No season data available.
+            {% else %}
+                No tracked players found for this season. Run the scraper to pull from your LL player tracker.
+            {% endif %}
+        </p>
+    </div>
+    {% else %}
+
+    <div class="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+        <table class="min-w-full divide-y divide-slate-700">
+            <thead class="bg-slate-800">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Player</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Rundle</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Rank</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider" title="Total Correct Answers">TCA</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider" title="Correct Answer Percentage">CA%</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800">
+                {% for player in tracked %}
+                <tr class="hover:bg-slate-800">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <a href="/player/{{ player.ll_username }}" class="text-emerald-400 hover:text-emerald-300 font-medium">{{ player.ll_username }}</a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-300">{{ player.rundle }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-100">{{ player.final_rank or '—' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-100">{{ player.tca or 0 }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-100">
+                        {% if player.ca_pct is not none %}{{ player.ca_pct }}%{% else %}—{% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm space-x-3">
+                        <a href="/player/{{ player.ll_username }}" class="text-emerald-400 hover:text-emerald-300">Profile</a>
+                        <a href="/player/{{ player.ll_username }}/surprise" class="text-slate-400 hover:text-emerald-400">Surprise</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
