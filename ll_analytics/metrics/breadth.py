@@ -52,9 +52,15 @@ class CategoryBreadthMetric(BaseMetric):
         player_id: int,
         season_id: int | None = None,
     ) -> list[dict]:
-        """Get category stats for a player, filtered to categories with >= 5 questions."""
+        """Get category stats for a player.
+
+        For current season: include all categories with >= 1 question (mid-season
+        has small samples per category so a high threshold hides weak categories).
+        Fallback to lifetime stats (>= 5 questions) if no season data.
+        """
+        season_rows = []
         if season_id:
-            rows = conn.execute("""
+            season_rows = conn.execute("""
                 SELECT c.name, pcs.correct_pct, pcs.total_questions
                 FROM player_category_stats pcs
                 JOIN categories c ON pcs.category_id = c.id
@@ -62,18 +68,24 @@ class CategoryBreadthMetric(BaseMetric):
                 ORDER BY pcs.correct_pct DESC
             """, (player_id, season_id)).fetchall()
 
-        if not season_id or not rows:
-            rows = conn.execute("""
-                SELECT c.name, pls.correct_pct, pls.total_questions
-                FROM player_lifetime_stats pls
-                JOIN categories c ON pls.category_id = c.id
-                WHERE pls.player_id = ?
-                ORDER BY pls.correct_pct DESC
-            """, (player_id,)).fetchall()
+        if season_rows:
+            return [
+                {"name": r["name"], "pct": r["correct_pct"], "questions": r["total_questions"]}
+                for r in season_rows
+            ]
+
+        # Fallback to lifetime stats
+        lifetime_rows = conn.execute("""
+            SELECT c.name, pls.correct_pct, pls.total_questions
+            FROM player_lifetime_stats pls
+            JOIN categories c ON pls.category_id = c.id
+            WHERE pls.player_id = ?
+            ORDER BY pls.correct_pct DESC
+        """, (player_id,)).fetchall()
 
         return [
             {"name": r["name"], "pct": r["correct_pct"], "questions": r["total_questions"]}
-            for r in rows
+            for r in lifetime_rows
             if (r["total_questions"] or 0) >= 5
         ]
 
