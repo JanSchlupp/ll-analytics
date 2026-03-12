@@ -43,6 +43,14 @@ app.include_router(pages.router, tags=["Pages"])
 async def startup_event():
     """Initialize database and start daily scrape scheduler."""
     init_db()
+    # Clear SQLite metric cache on startup so deploys never serve stale results.
+    # The in-memory response_cache resets automatically on restart.
+    from ..database import get_connection
+    with get_connection() as conn:
+        deleted = conn.execute("DELETE FROM metric_cache").rowcount
+        conn.commit()
+    if deleted:
+        logger.info("Cleared %d stale metric_cache rows on startup", deleted)
     start_scheduler()
 
 
