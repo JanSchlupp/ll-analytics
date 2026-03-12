@@ -15,6 +15,7 @@ class VisualizationType(Enum):
     HEATMAP = "heatmap"          # Category x Time grids
     SCATTER = "scatter"          # Correlations
     HISTOGRAM = "histogram"      # Distributions
+    TEXT = "text"                # Plain text / summary
 
 
 class Scope(Enum):
