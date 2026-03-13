@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ..config import Config
 from ..logging import setup_logging, get_logger
-from ..database import init_db
+from ..database import init_db, get_connection
 
 setup_logging(Config.LOG_LEVEL, Config.LOG_FILE)
 from .routes import players, seasons, metrics, surprise_routes, luck_routes, pages, heatmap_routes
@@ -45,12 +45,14 @@ async def startup_event():
     init_db()
     # Clear SQLite metric cache on startup so deploys never serve stale results.
     # The in-memory response_cache resets automatically on restart.
-    from ..database import get_connection
-    with get_connection() as conn:
-        deleted = conn.execute("DELETE FROM metric_cache").rowcount
-        conn.commit()
-    if deleted:
-        logger.info("Cleared %d stale metric_cache rows on startup", deleted)
+    try:
+        with get_connection() as conn:
+            deleted = conn.execute("DELETE FROM metric_cache").rowcount
+            conn.commit()
+        if deleted:
+            logger.info("Cleared %d stale metric_cache rows on startup", deleted)
+    except Exception as e:
+        logger.warning("Could not clear metric_cache on startup: %s", e)
     start_scheduler()
 
 
