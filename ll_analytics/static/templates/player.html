@@ -11,6 +11,17 @@
 {% else %}
 
 <div x-data="{ activeTab: 'overview', expandedMetric: null }">
+    <!-- Breadcrumb -->
+    <nav class="text-sm text-slate-500 mb-4">
+        <a href="/" class="hover:text-slate-300">Standings</a>
+        {% if player_rundle %}
+        <span class="mx-1">&rsaquo;</span>
+        <a href="/?rundle={{ player_rundle.id }}" class="hover:text-slate-300">{{ player_rundle.name }}</a>
+        {% endif %}
+        <span class="mx-1">&rsaquo;</span>
+        <span class="text-slate-300">{{ player.ll_username }}</span>
+    </nav>
+
     <!-- Header -->
     <div class="mb-6">
         <div class="flex items-center gap-4">
@@ -80,10 +91,14 @@
     <div x-show="activeTab === 'overview'" class="space-y-6">
         <!-- Quick Links -->
         {% if season %}
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
             <a href="/player/{{ player.ll_username }}/heatmap?season={{ season.season_number }}"
                class="inline-flex items-center px-3 py-1.5 bg-emerald-900/40 text-emerald-400 text-sm rounded-md hover:bg-emerald-900/60">
                 View Performance Heatmap &rarr;
+            </a>
+            <a href="/player/{{ player.ll_username }}/h2h?season={{ season.season_number }}"
+               class="inline-flex items-center px-3 py-1.5 bg-slate-800 text-slate-300 text-sm rounded-md hover:bg-slate-700">
+                Head-to-Head Analysis &rarr;
             </a>
         </div>
         {% endif %}
@@ -275,6 +290,8 @@
                 </div>
 
                 <!-- Late Spike Metric Details -->
+                {% elif metric_id == 'late_spike' and metric.result.data.get('insufficient_data') %}
+                <p class="text-sm text-slate-400 italic">{{ metric.result.data.get('message', 'Not enough season data yet') }}</p>
                 {% elif metric_id == 'late_spike' and metric.result.data.get('early') is not none %}
                 <div class="space-y-4">
                     <div class="grid grid-cols-4 gap-4 text-center">

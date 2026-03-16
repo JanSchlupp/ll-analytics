@@ -29,7 +29,7 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Player</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Rundle</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Rank</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider" title="Rank / Rundle Size">Rank</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider" title="Total Correct Answers">TCA</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider" title="Correct Answer Percentage">CA%</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
@@ -41,8 +41,12 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                         <a href="/player/{{ player.ll_username }}" class="text-emerald-400 hover:text-emerald-300 font-medium">{{ player.ll_username }}</a>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-300">{{ player.rundle }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-100">{{ player.final_rank or '—' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                        <a href="/?rundle={{ player.rundle_id }}" class="hover:text-emerald-400">{{ player.rundle }}</a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-100">
+                        {% if player.final_rank %}{{ player.final_rank }} / {{ player.rundle_size }}{% else %}— / {{ player.rundle_size }}{% endif %}
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-100">{{ player.tca or 0 }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-100">
                         {% if player.ca_pct is not none %}{{ player.ca_pct }}%{% else %}—{% endif %}

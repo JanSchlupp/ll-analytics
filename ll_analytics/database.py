@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS players (
     id INTEGER PRIMARY KEY,
     ll_username TEXT UNIQUE NOT NULL,
     display_name TEXT,
+    ll_id INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -149,6 +150,9 @@ CREATE INDEX IF NOT EXISTS idx_player_lifetime_stats_player ON player_lifetime_s
 CREATE INDEX IF NOT EXISTS idx_matches_season_day ON matches(season_id, match_day);
 CREATE INDEX IF NOT EXISTS idx_match_questions_match ON match_questions(match_id);
 CREATE INDEX IF NOT EXISTS idx_tracked_players_season ON tracked_players(season_id);
+CREATE INDEX IF NOT EXISTS idx_players_ll_id ON players(ll_id);
+CREATE INDEX IF NOT EXISTS idx_player_rundles_rundle ON player_rundles(rundle_id);
+CREATE INDEX IF NOT EXISTS idx_player_category_stats_season ON player_category_stats(season_id);
 """
 
 

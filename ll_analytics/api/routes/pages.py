@@ -131,6 +131,15 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
                 "SELECT * FROM seasons ORDER BY season_number DESC LIMIT 1"
             ).fetchone()
 
+        player_rundle = None
+        if season_row:
+            player_rundle = conn.execute("""
+                SELECT r.id, r.name
+                FROM rundles r
+                JOIN player_rundles pr ON r.id = pr.rundle_id
+                WHERE pr.player_id = ? AND r.season_id = ?
+            """, (player["id"], season_row["id"])).fetchone()
+
         season_category_stats = []
         if season_row:
             season_category_stats = conn.execute("""
@@ -245,6 +254,7 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
             "request": request,
             "player": dict(player),
             "season": dict(season_row) if season_row else None,
+            "player_rundle": dict(player_rundle) if player_rundle else None,
             "category_stats": [dict(c) for c in category_stats],
             "season_category_stats": [dict(c) for c in season_category_stats],
             "lifetime_category_stats": [dict(c) for c in lifetime_category_stats],
@@ -254,6 +264,86 @@ async def player_profile(request: Request, username: str, season: Optional[int] 
             "metrics": metrics_data,
             "all_metrics": MetricRegistry.all_info(),
         })
+
+
+@router.get("/player/{username}/h2h", response_class=HTMLResponse)
+async def player_h2h(request: Request, username: str, season: Optional[int] = Query(None)):
+    """Player head-to-head analysis page."""
+    if not templates:
+        return RedirectResponse(f"/api/players/{username}")
+
+    with get_connection() as conn:
+        player = conn.execute(
+            "SELECT * FROM players WHERE ll_username = ?", (username,)
+        ).fetchone()
+
+        if not player:
+            return templates.TemplateResponse("player.html", {
+                "request": request,
+                "player": None,
+                "error": f"Player '{username}' not found",
+            })
+
+        if season:
+            season_row = conn.execute(
+                "SELECT * FROM seasons WHERE season_number = ?", (season,)
+            ).fetchone()
+        else:
+            season_row = conn.execute(
+                "SELECT * FROM seasons ORDER BY season_number DESC LIMIT 1"
+            ).fetchone()
+
+        h2h_matches = []
+        if season_row:
+            h2h_matches = conn.execute("""
+                SELECT
+                    m.match_day,
+                    CASE WHEN m.player1_id = ? THEN m.player1_score ELSE m.player2_score END as my_score,
+                    CASE WHEN m.player1_id = ? THEN m.player2_score ELSE m.player1_score END as opp_score,
+                    CASE WHEN m.player1_id = ? THEN m.player1_tca ELSE m.player2_tca END as my_tca,
+                    CASE WHEN m.player1_id = ? THEN p2.ll_username ELSE p1.ll_username END as opponent,
+                    CASE
+                        WHEN (m.player1_id = ? AND m.player1_score > m.player2_score) OR
+                             (m.player2_id = ? AND m.player2_score > m.player1_score) THEN 'W'
+                        WHEN m.player1_score = m.player2_score THEN 'T'
+                        ELSE 'L'
+                    END as result
+                FROM matches m
+                JOIN players p1 ON m.player1_id = p1.id
+                JOIN players p2 ON m.player2_id = p2.id
+                WHERE m.season_id = ? AND (m.player1_id = ? OR m.player2_id = ?)
+                ORDER BY m.match_day
+            """, (player["id"], player["id"], player["id"], player["id"],
+                  player["id"], player["id"], season_row["id"], player["id"], player["id"])).fetchall()
+
+        # Aggregate per-opponent stats
+        opp_stats: dict[str, dict] = {}
+        for m in h2h_matches:
+            opp = m["opponent"]
+            if opp not in opp_stats:
+                opp_stats[opp] = {"opponent": opp, "wins": 0, "losses": 0, "ties": 0, "tca_total": 0, "matches": 0}
+            s = opp_stats[opp]
+            s["matches"] += 1
+            s["tca_total"] += m["my_tca"] or 0
+            if m["result"] == "W":
+                s["wins"] += 1
+            elif m["result"] == "L":
+                s["losses"] += 1
+            else:
+                s["ties"] += 1
+
+        for s in opp_stats.values():
+            s["avg_tca"] = round(s["tca_total"] / s["matches"], 2) if s["matches"] else 0
+
+        opponents = sorted(opp_stats.values(), key=lambda x: x["matches"], reverse=True)
+
+    return templates.TemplateResponse("h2h.html", {
+        "request": request,
+        "player": dict(player),
+        "season": dict(season_row) if season_row else None,
+        "opponents": opponents,
+        "h2h_matches": [dict(m) for m in h2h_matches],
+    })
 
 
 @router.get("/player/{username}/surprise", response_class=HTMLResponse)
@@ -430,8 +520,10 @@ async def watchlist_page(request: Request, season: Optional[int] = Query(None)):
         tracked_rows = conn.execute("""
             SELECT
                 p.ll_username,
+                r.id as rundle_id,
                 r.name as rundle,
                 pr.final_rank,
+                (SELECT COUNT(*) FROM player_rundles pr2 WHERE pr2.rundle_id = r.id) as rundle_size,
                 COALESCE(
                     (SELECT SUM(CASE WHEN m.player1_id = p.id THEN m.player1_tca ELSE m.player2_tca END)
                      FROM matches m WHERE m.season_id = :sid AND (m.player1_id = p.id OR m.player2_id = p.id)),

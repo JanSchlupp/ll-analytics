@@ -571,7 +571,10 @@ class LLScraper:
 
                 # Ensure all 6 question rows exist for this day before saving answers.
                 # Use the Miscellaneous category as a placeholder (updated below when known).
-                misc_cat_id = categories.get('Miscellaneous', 18)
+                misc_cat_id = categories.get('Miscellaneous')
+                if misc_cat_id is None:
+                    raise RuntimeError("'Miscellaneous' category not found in DB — was init_db() run?")
+
                 for q_num in range(1, 7):
                     conn.execute(
                         "INSERT OR IGNORE INTO questions (season_id, match_day, question_number, category_id) VALUES (?, ?, ?, ?)",
@@ -617,8 +620,8 @@ class LLScraper:
                                 VALUES (?, ?, ?, ?)
                             """, (player_id, q_id, pa.get(f'q{q_num}_correct', False), pa.get(f'q{q_num}_defense', 0)))
                             day_answers += 1
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            logger.warning("Failed to insert answer player=%s q=%d: %s", pa.get('ll_id'), q_num, exc)
 
                 conn.commit()
                 total_answers += day_answers
@@ -667,10 +670,12 @@ class LLScraper:
                 return
             season_id = season_row["id"]
 
-            misc_cat_id = conn.execute(
+            misc_row = conn.execute(
                 "SELECT id FROM categories WHERE name = 'Miscellaneous'"
             ).fetchone()
-            misc_id = misc_cat_id["id"] if misc_cat_id else 18
+            if not misc_row:
+                raise RuntimeError("'Miscellaneous' category not found in DB — was init_db() run?")
+            misc_id = misc_row["id"]
 
             updated = conn.execute("""
                 UPDATE questions SET category_id = (
@@ -713,10 +718,12 @@ class LLScraper:
                 return
             season_id = season_row["id"]
 
-            misc_cat_id = conn.execute(
+            misc_row = conn.execute(
                 "SELECT id FROM categories WHERE name = 'Miscellaneous'"
             ).fetchone()
-            misc_id = misc_cat_id["id"] if misc_cat_id else 18
+            if not misc_row:
+                raise RuntimeError("'Miscellaneous' category not found in DB — was init_db() run?")
+            misc_id = misc_row["id"]
 
             rows = conn.execute("""
                 SELECT a.player_id, q.category_id, q.season_id,

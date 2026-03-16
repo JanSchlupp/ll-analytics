@@ -147,8 +147,31 @@ class LateSeasonSpikeMetric(BaseMetric):
             conn, player_id, season_id, self.LATE_DAYS
         )
 
+        if not late_surprises:
+            return MetricResult(
+                metric_id=self.id,
+                title=f"Late-Season Spike - {player['ll_username']}",
+                description=self.description,
+                data={
+                    "player": player["ll_username"],
+                    "season_id": season_id,
+                    "insufficient_data": True,
+                    "message": f"Not enough season data yet (need day {min(self.LATE_DAYS)}+)",
+                    "early": {
+                        "days": f"{min(self.EARLY_DAYS)}-{max(self.EARLY_DAYS)}",
+                        "questions": len(early_surprises),
+                    },
+                    "late": {
+                        "days": f"{min(self.LATE_DAYS)}-{max(self.LATE_DAYS)}",
+                        "questions": 0,
+                    },
+                },
+                visualization=VisualizationType.BAR_CHART,
+                scope=Scope.PLAYER,
+            )
+
         early_avg = statistics.mean(early_surprises) if early_surprises else 0
-        late_avg = statistics.mean(late_surprises) if late_surprises else 0
+        late_avg = statistics.mean(late_surprises)
         delta = late_avg - early_avg
 
         # Calculate z-score if we have enough data

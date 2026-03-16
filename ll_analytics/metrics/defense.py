@@ -149,24 +149,24 @@ class DefenseStrategyMetric(BaseMetric):
 
         for r in rows:
             if r["player1_id"] == player_id:
-                # We are player1; our defense assignment is player1_defense
-                # player1_defense = defense pts player2 assigned TO player1
-                # player2_defense = defense pts player1 assigned TO player2
-                our_defense = r["player2_defense"] or 0  # what we assigned to opponent's question
+                # We are player1.
+                # Schema: player2_defense = pts player1 assigned to player2's questions (our assignment)
+                #         player1_defense = pts player2 assigned to player1's questions (opponent's assignment)
+                defense_we_assigned = r["player2_defense"] or 0
                 opp_correct = r["player2_correct"]
                 opp_id = r["player2_id"]
             else:
-                # We are player2; our defense assignment is player2_defense
-                # player1_defense = defense pts player2 assigned TO player1
-                # player2_defense = defense pts player1 assigned TO player2
-                our_defense = r["player1_defense"] or 0  # what we assigned to opponent's question
+                # We are player2.
+                # Schema: player1_defense = pts player2 assigned to player1's questions (our assignment)
+                #         player2_defense = pts player1 assigned to player2's questions (opponent's assignment)
+                defense_we_assigned = r["player1_defense"] or 0
                 opp_correct = r["player1_correct"]
                 opp_id = r["player1_id"]
 
-            all_defense_pts.append(our_defense)
+            all_defense_pts.append(defense_we_assigned)
 
             # Effectiveness: when we assign 2+ defense, how often does opponent miss?
-            if our_defense >= 2:
+            if defense_we_assigned >= 2:
                 high_defense_total += 1
                 if not opp_correct:
                     high_defense_opp_wrong += 1
@@ -180,13 +180,13 @@ class DefenseStrategyMetric(BaseMetric):
             if cat_id and opp_id in opp_lifetime and cat_id in opp_lifetime[opp_id]:
                 opp_cat_pct = opp_lifetime[opp_id][cat_id]
                 opp_weakness = 1.0 - opp_cat_pct  # higher = weaker
-                targeting_pairs.append((our_defense, opp_weakness))
+                targeting_pairs.append((defense_we_assigned, opp_weakness))
 
             # ROI: points saved vs points lost
             if not opp_correct:
-                total_points_saved += our_defense
+                total_points_saved += defense_we_assigned
             else:
-                total_points_lost += our_defense
+                total_points_lost += defense_we_assigned
 
         # Calculate metrics
         allocation_gini = _gini_coefficient(all_defense_pts)
