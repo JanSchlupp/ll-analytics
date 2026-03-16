@@ -253,7 +253,7 @@ function standingsTable() {
                     if (data.data && Array.isArray(data.data)) {
                         data.data.forEach(item => {
                             const username = item.username || item.player;
-                            const value = item.total_surprise ?? item.avg_luck_per_match ?? item.value ?? item.score;
+                            const value = item.total_surprise ?? item.total_luck ?? item.avg_luck_per_match ?? item.value ?? item.score;
                             if (username && value !== undefined) {
                                 this.metricsData[username] = value;
                             }
